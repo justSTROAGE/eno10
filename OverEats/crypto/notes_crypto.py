@@ -8,39 +8,51 @@ from Crypto.Util.Padding import pad, unpad
 BLOCK_SIZE = 16
 
 
+def _derive_keys(master_key: bytes) -> tuple:
+    """Derive separate encryption and MAC keys from the master key."""
+    enc_key = hmac_module.new(master_key, b"enc", hashlib.sha256).digest()[:16]
+    mac_key = hmac_module.new(master_key, b"mac", hashlib.sha256).digest()
+    return enc_key, mac_key
+
+
 def encrypt_note(owner_id: int, note_text: str, key: bytes) -> tuple:
-    
+
     owner_str = str(owner_id).zfill(10)
     plaintext = f"owner={owner_str}|note={note_text}"
     plaintext_bytes = plaintext.encode('utf-8')
 
     iv = os.urandom(BLOCK_SIZE)
 
-    cipher = AES.new(key, AES.MODE_CBC, iv)
+    enc_key, mac_key = _derive_keys(key)
+    cipher = AES.new(enc_key, AES.MODE_CBC, iv)
     ciphertext = cipher.encrypt(pad(plaintext_bytes, BLOCK_SIZE))
 
     encrypted_data = iv + ciphertext
 
-    hmac_sig = hmac_module.new(key, ciphertext, hashlib.sha256).digest()
+    # HMAC covers BOTH the IV and the ciphertext so the IV cannot be tampered with.
+    hmac_sig = hmac_module.new(mac_key, iv + ciphertext, hashlib.sha256).digest()
 
     return encrypted_data, hmac_sig
 
 
 def decrypt_note(encrypted_data: bytes, hmac_sig: bytes, key: bytes,
                  expected_owner: int) -> str | None:
-   
+
     if len(encrypted_data) < BLOCK_SIZE + BLOCK_SIZE:
         raise ValueError("Encrypted data too short")
 
     iv = encrypted_data[:BLOCK_SIZE]
     ciphertext = encrypted_data[BLOCK_SIZE:]
 
-    expected_hmac = hmac_module.new(key, ciphertext, hashlib.sha256).digest()
+    enc_key, mac_key = _derive_keys(key)
+
+    # Verify HMAC over IV + ciphertext (the IV is now integrity-protected).
+    expected_hmac = hmac_module.new(mac_key, iv + ciphertext, hashlib.sha256).digest()
 
     if not hmac_module.compare_digest(hmac_sig, expected_hmac):
         raise ValueError("HMAC verification failed - data has been tampered with")
 
-    cipher = AES.new(key, AES.MODE_CBC, iv)
+    cipher = AES.new(enc_key, AES.MODE_CBC, iv)
     try:
         plaintext = unpad(cipher.decrypt(ciphertext), BLOCK_SIZE)
     except ValueError:
@@ -68,12 +80,12 @@ def decrypt_note(encrypted_data: bytes, hmac_sig: bytes, key: bytes,
 
 
 def export_note_blob(encrypted_data: bytes, hmac_sig: bytes) -> str:
-   
+
     return (encrypted_data + hmac_sig).hex()
 
 
 def import_note_blob(blob_hex: str) -> tuple:
-    
+
     raw = bytes.fromhex(blob_hex)
     if len(raw) < BLOCK_SIZE + BLOCK_SIZE + 32:
         raise ValueError("Blob too short")

@@ -149,12 +149,58 @@ fn op_setperm(op: []u8, t: *mach::task) void = {
 		mach::push(t, 0);
 		return;
 	};
+	// Validate objname/prefix: reject GLOB metacharacters and other invalid
+	// characters, mirroring the HTTP set_share OBJECTNAME_RE constraint.
+	const objbytes = strings::toutf8(objname);
+	if (len(objbytes) == 0 || len(objbytes) > 64) {
+		fmt::fprintln(os::stderr, "op_setperm failed, invalid prefix length")!;
+		mach::push(t, 0);
+		return;
+	};
+	for (let i = 0z; i < len(objbytes); i += 1) {
+		const c = objbytes[i]: u32;
+		const ok = (c >= 'A' && c <= 'Z')
+			|| (c >= 'a' && c <= 'z')
+			|| (c >= '0' && c <= '9')
+			|| c == '_' || c == '.' || c == '-' || c == '/';
+		if (!ok) {
+			fmt::fprintln(os::stderr, "op_setperm failed, invalid prefix")!;
+			mach::push(t, 0);
+			return;
+		};
+	};
+	// Validate receiver: must be a valid username or '*public'.
+	if (recv != "*public") {
+		const recvbytes = strings::toutf8(recv);
+		if (len(recvbytes) == 0 || len(recvbytes) > 32) {
+			fmt::fprintln(os::stderr, "op_setperm failed, invalid receiver")!;
+			mach::push(t, 0);
+			return;
+		};
+		for (let i = 0z; i < len(recvbytes); i += 1) {
+			const c = recvbytes[i]: u32;
+			const ok = (c >= 'A' && c <= 'Z')
+				|| (c >= 'a' && c <= 'z')
+				|| (c >= '0' && c <= '9')
+				|| c == '_' || c == '-';
+			if (!ok) {
+				fmt::fprintln(os::stderr, "op_setperm failed, invalid receiver")!;
+				mach::push(t, 0);
+				return;
+			};
+		};
+	};
 	db::set_share(owner, objname, scope, recv, permstr, effectstr);
 	mach::push(t, 1);
 };
 
 fn op_getuuid(op: []u8, t: *mach::task) void = {
 	const ptr = mach::pop(t): size;
+	if (ptr + 32 > mach::MEM_SIZE) {
+		fmt::fprintln(os::stderr, "op_getuuid failed, out of bounds")!;
+		mach::push(t, 0);
+		return;
+	};
 	t.mem[ptr..ptr+32] = strings::toutf8(hex::encodestr(uuid::generate())!);
 };
 

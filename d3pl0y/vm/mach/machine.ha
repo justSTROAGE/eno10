@@ -38,8 +38,12 @@ export fn pop(t: *task) u32 = {
 };
 
 export fn stack_get_buf(t: *task) []u8 = {
-	const buf_ptr = pop(t);
-	const buf_len = pop(t);
+	const buf_ptr = pop(t): size;
+	const buf_len = pop(t): size;
+	if (buf_len > MEM_SIZE || buf_ptr > MEM_SIZE
+			|| buf_ptr + buf_len > MEM_SIZE) {
+		pr_err("stack_get_buf out of bounds");
+	};
 	return t.mem[buf_ptr..buf_ptr+buf_len];
 };
 
@@ -64,7 +68,7 @@ export fn newtask(objectname: str, arg: []u8, caller: str) (task | fs::error | i
 	let t = task {
 		obj = obj,
 		arg = arg,
-		owner = owner,
+		owner = caller,
 		...
 	};
 

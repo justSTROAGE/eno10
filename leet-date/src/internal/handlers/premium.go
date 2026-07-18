@@ -107,12 +107,21 @@ func (d *PremiumDeps) GetUserPerk(c *gin.Context) {
 	}
 
 	viewerID := c.GetInt64(auth.ContextUserID)
+	viewerHandle := strings.ToLower(c.GetString(auth.ContextHandle))
 	viewerPremium, err := userIsPremium(c, d.Pool, viewerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
 		return
 	}
 	if !viewerPremium {
+		c.JSON(http.StatusNotFound, gin.H{"error": "perk not found"})
+		return
+	}
+
+	// Defense (IDOR): a premium user may only read their OWN perk_text. Reading
+	// another user's perk exposed every team's flag via this endpoint. Any
+	// request for a handle other than the authenticated viewer's is refused.
+	if handle != viewerHandle {
 		c.JSON(http.StatusNotFound, gin.H{"error": "perk not found"})
 		return
 	}

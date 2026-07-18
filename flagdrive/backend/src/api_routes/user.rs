@@ -86,7 +86,13 @@ pub async fn follow_user_action(
             .unwrap();
     };
 
-    if !auth_token.is_api_token() && username_from_token != target_username {
+    // Authorization: the authenticated user (resolved from the token) must be
+    // the same user named in the path. The previous code allowed a client-set
+    // `is_api_token` flag to bypass this check (see auth.rs overflow fix); the
+    // "api token" concept does not exist, so the bypass is removed entirely.
+    // The target_username (the user performing the follow) must always equal
+    // the username resolved from the token.
+    if username_from_token != target_username {
         return Response::builder()
             .status(StatusCode::FORBIDDEN)
             .header("content-type", "application/json")
@@ -223,7 +229,11 @@ pub async fn unfollow_user_action(
             .unwrap();
     };
 
-    if !auth_token.is_api_token() && username_from_token != target_username {
+    // Authorization: the authenticated user (resolved from the token) must be
+    // the same user named in the path. The client-influenceable `is_api_token`
+    // bypass is removed entirely (see auth.rs overflow fix). The target user
+    // performing the unfollow must always equal the token's user.
+    if username_from_token != target_username {
         return Response::builder()
             .status(StatusCode::FORBIDDEN)
             .header("content-type", "application/json")

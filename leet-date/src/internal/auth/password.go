@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/md5"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/argon2"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const hashConcurrency = 16
@@ -27,13 +29,45 @@ func derive(password string, salt []byte, t, m uint32, p uint8, keyLen uint32) [
 	return argon2.IDKey([]byte(password), salt, t, m, p, keyLen)
 }
 
+// HashPassword stores passwords as a bcrypt digest (salted, adaptive).
+// Previously this was a single unsalted MD5 hex digest, trivially crackable
+// via rainbow tables whenever a hash leaked.
 func HashPassword(password string) (string, error) {
-	sum := md5.Sum([]byte(password))
-	return hex.EncodeToString(sum[:]), nil
+	// bcrypt uses only the first 72 bytes of the input. The API layer already
+	// enforces 8..128 char passwords; to avoid silently truncating longer
+	// passwords (which would let two distinct passwords collide), pre-hash
+	// anything beyond 72 bytes with SHA-256 and bcrypt that digest.
+	pw := []byte(password)
+	if len(pw) > 72 {
+		sum := sha256.Sum256(pw)
+		pw = []byte(hex.EncodeToString(sum[:]))
+	}
+	hash, err := bcrypt.GenerateFromPassword(pw, 12)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
 }
 
+// VerifyPassword accepts the current bcrypt form as well as the legacy
+// argon2id and (legacy) unsalted-MD5 forms so already-stored rows can still
+// authenticate. New registrations always produce bcrypt.
 func VerifyPassword(password, encoded string) (bool, error) {
+	if strings.HasPrefix(encoded, "$2") {
+		// bcrypt: $2a$, $2b$, $2y$. Mirror HashPassword's >72-byte prehash.
+		pw := []byte(password)
+		if len(pw) > 72 {
+			sum := sha256.Sum256(pw)
+			pw = []byte(hex.EncodeToString(sum[:]))
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(encoded), pw); err != nil {
+			return false, nil
+		}
+		return true, nil
+	}
+
 	if !strings.HasPrefix(encoded, "$") {
+		// legacy unsalted MD5 hex digest (kept only for backwards compatibility)
 		want, err := hex.DecodeString(encoded)
 		if err != nil {
 			return false, ErrInvalidHash
