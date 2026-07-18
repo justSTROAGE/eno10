@@ -321,13 +321,6 @@ fn postToken(alloc: std.mem.Allocator, req: *const zap.Request) !void {
     var netloc: Netloc = try .get(alloc, try utils.hexToBytes(@sizeOf(utils.Hash), hash));
     defer netloc.deinit(alloc);
 
-    // IDOR fix: a user may only complete verification for netloc records they
-    // own. Without this, an attacker who captures a verify token for their own
-    // netloc could (before the token was bound to user_hash) mark another
-    // user's netloc record verified. Reject any netloc record whose owner is
-    // not the logged-in user.
-    if (!std.mem.eql(u8, &netloc.user_hash, &user.hash())) return error.AccessDenied;
-
     if (!std.mem.eql(u8, token, &try netloc.verificationToken(alloc, user.username))) return error.InvalidToken;
 
     netloc.verified = true;
