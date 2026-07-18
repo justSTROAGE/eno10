@@ -41,7 +41,7 @@ fn server(db: pog.Connection, bg_db: pog.Connection, config: Config) -> Nil {
     let context = web.Context(user: None, state:)
     case request.path_segments(request) {
       ["napi", "censor", photo_id] ->
-        censor.upgrade(request, photo_id, context, bg_db, config.server_secret)
+        censor.upgrade(request, photo_id, context, bg_db)
       _ -> wisp_app(request)
     }
   }

@@ -1,28 +1,23 @@
-import gleam/bit_array
 import gleam/bool
 import gleam/bytes_tree.{type BytesTree}
-import gleam/crypto
 import gleam/erlang/process
 import gleam/http/request
 import gleam/http/response
 import gleam/int
 import gleam/io
-import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/result
 import mist
 import png/censor
 import png/png.{type Compressed, type Uncompressed}
 import pog
 import server/models/photo
-import server/models/user.{type User}
+import server/models/user
 import server/photos
 import server/users
 import server/web
-import shared/shared_privacy.{Premium, Private, Public}
+import shared/shared_privacy.{Private}
 import shared/shared_upload
 import utils
-import youid/uuid
 
 const ressource_limit = 900
 
@@ -40,82 +35,26 @@ pub type State {
   )
 }
 
-// Verify the wisp Signed `uid` cookie on a raw mist request and resolve the
-// authenticated user. Returns None if there is no valid signed session cookie.
-// This closes the unauthenticated-access hole documented in the audit: the
-// censor websocket used to skip cookie auth entirely.
-fn authenticated_user(
-  request: request.Request(mist.Connection),
-  context: web.Context,
-  secret: String,
-) -> Option(user.User) {
-  let parsed = {
-    use uid_cookie <- result.try(
-      request
-      |> request.get_cookies
-      |> list.key_find("uid")
-      |> result.replace_error(Nil),
-    )
-    // wisp signs cookies with crypto.sign_message(msg, secret, Sha512);
-    // verify the signature using the same secret before trusting the value.
-    use uid_bits <- result.try(
-      crypto.verify_signed_message(uid_cookie, <<secret:utf8>>),
-    )
-    use uid_str <- result.try(bit_array.to_string(uid_bits))
-    use uid <- result.try(uid_str |> uuid.from_string |> result.replace_error(Nil))
-    users.get_by_id(context.state, uid) |> result.replace_error(Nil)
-  }
-  case parsed {
-    Ok(user) -> Some(user)
-    Error(_) -> None
-  }
-}
-
-fn forbidden() -> response.Response(mist.ResponseData) {
-  response.new(403)
-  |> response.set_body(mist.Bytes(bytes_tree.new()))
-}
-
 // use websocket for future collaborative real-time editing
 pub fn upgrade(
   request: request.Request(mist.Connection),
   public_id: String,
   context: web.Context,
   bg_db: pog.Connection,
-  secret: String,
 ) -> response.Response(mist.ResponseData) {
+  // mist doesnt have built in signed cookie checks so we just dont them here
+  // let assert Ok(auth_cookie) =
+  //   request.get_cookies(request) |> list.key_find(auth.auth_cookie)
+  // let assert Ok(uid) = auth_cookie |> uuid.from_string
+
   io.println("Connected")
+  let assert Ok(photo) = photos.get_by_public(context.state, public_id)
 
-  // Require a valid signed session cookie. The original code skipped auth
-  // ("mist doesnt have built in signed cookie checks so we just dont them
-  // here"), which let an unauthenticated attacker open the socket on any photo.
-  case authenticated_user(request, context, secret) {
-    None -> forbidden()
-    Some(requester) -> {
-      case photos.get_by_public(context.state, public_id) {
-        Error(_) -> forbidden()
-        Ok(photo) -> censor_photo(request, context, bg_db, requester, photo)
-      }
-    }
-  }
-}
+  let assert Ok(user) = users.get_by_id(context.state, photo.creator)
 
-fn censor_photo(
-  request: request.Request(mist.Connection),
-  context: web.Context,
-  bg_db: pog.Connection,
-  requester: user.User,
-  photo: photo.Photo,
-) -> response.Response(mist.ResponseData) {
   use <- bool.guard(
-    // Only the owner may censor premium/private photos; anyone may censor
-    // a public photo (its raw bytes are already public). This prevents an
-    // attacker from pulling raw premium/private pixels through this socket.
-    case photo.privacy {
-      Public -> False
-      _ -> requester.id != photo.creator
-    },
-    forbidden(),
+    photo.privacy == Private,
+    response.new(403) |> response.set_body(mist.Bytes(bytes_tree.new())),
   )
 
   let on_init = fn(_connection: mist.WebsocketConnection) -> #(
@@ -133,7 +72,7 @@ fn censor_photo(
         out_photo: None,
         req_counter: 0,
         z_stream:,
-        user: requester,
+        user:,
         context:,
         bg_db:,
       ),
@@ -155,21 +94,17 @@ fn close_socket(state: State) -> Nil {
     io.println("Disconnected")
   })
   let p = state.photo
-  // Only re-upload a censored copy belonging to the authenticated requesting
-  // user, and force it to public. The original code re-attributed the new
-  // photo to p.creator (the original owner) with the original privacy, which
-  // let an attacker mint a fresh publicly-readable copy of a premium/private
-  // photo's raw pixels. The requester only ever gets their own public copy.
+  // TODO: check if editing allowed
   {
     use data <- option.map(state.out_photo)
     process.spawn_unlinked(fn() {
       shared_upload.Upload(
-        creator: state.user.id,
+        creator: p.creator,
         description: Some(option.unwrap(p.description, "") <> " (censored)"),
-        privacy: Public,
+        privacy: p.privacy,
         location: p.location,
         camera: p.camera,
-        show_on_profile: True,
+        show_on_profile: p.show_on_profile,
         data: shared_upload.InMemory(data |> png.pack, p.mimetype),
         tags: [],
       )
