@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package compress;
+
+option go_package = "github.com/leonardopreuss/leet_date/internal/compresspb;compresspb";
+
+service Compressor {
+  rpc Compress(CompressRequest) returns (CompressResponse);
+  rpc Decompress(DecompressRequest) returns (DecompressResponse);
+}
+
+message CompressRequest {
+  bytes raw = 1;
+}
+
+message CompressResponse {
+  bytes blob = 1;
+}
+
+message DecompressRequest {
+  bytes blob = 1;
+}
+
+message DecompressResponse {
+  bytes raw = 1;
+}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Error {{ code }} — d3pl0y{% endblock %}
+{% block content %}
+<div class="card stack" style="text-align:center">
+  <div class="big" style="font-size:3rem;font-weight:800;color:var(--muted);font-family:var(--mono)">{{ code }}</div>
+  <h1 style="margin:0">{{ name }}</h1>
+  <p class="muted">{{ description }}</p>
+  <div class="btn-row" style="justify-content:center">
+    <a class="btn primary" href="{{ url_for('web.index') }}">Return home</a>
+  </div>
+</div>
+{% endblock %}

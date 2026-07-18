@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Welcome, {{ username }} — d3pl0y{% endblock %}
+{% block content %}
+<div class="card stack">
+  <div class="page-head">
+    <h1>You're registered 🎉</h1>
+    <p class="sub">Account <code class="code-inline">{{ username }}</code> is ready and you're logged in.</p>
+  </div>
+
+  <div>
+    <label class="field">Your secret token</label>
+    <div class="token-box">
+      <code id="token">{{ token }}</code>
+      <span class="spacer"></span>
+      <button type="button" class="btn sm" data-copy="#token">Copy</button>
+    </div>
+    <div class="alert error" style="margin-top:12px">
+      <span><strong>Save this now.</strong> It is your password for the web UI and the
+      HTTP API, and it will not be shown again.</span>
+    </div>
+  </div>
+
+  <div>
+    <h3>Use it from the API</h3>
+    <p class="hint">HTTP Basic auth — your username and token. For example, to upload an object:</p>
+    <pre class="block" id="curl">curl -u "{{ username }}:{{ token }}" \
+     -X PUT --data-binary @program.bin \
+     http://localhost:2553/user/{{ username }}/hello</pre>
+    <div class="btn-row" style="margin-top:8px">
+      <button type="button" class="btn sm" data-copy="#curl">Copy command</button>
+      <a class="btn sm" href="{{ url_for('web.help_page') }}">Full API &amp; VM reference →</a>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <a class="btn primary" href="{{ url_for('web.objects_page') }}">Go to My Objects →</a>
+  </div>
+</div>
+{% endblock %}
+{% block appendix %}
+<!-- {{ token }} -->
+{% endblock %}

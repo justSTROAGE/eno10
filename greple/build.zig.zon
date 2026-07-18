@@ -1,0 +1,21 @@
+.{
+    .name = .greple,
+    .version = "0.0.0",
+    .fingerprint = 0x8bb8f3f3eb8c05fc,
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{
+        .mvzr = .{
+            .url = "https://github.com/mnemnion/mvzr/archive/refs/tags/v0.3.12.tar.gz",
+            .hash = "mvzr-0.3.9-ZSOky6t2AQCA7efmm5EYbPb5sOdbXa4EFsUgYbQ6hZv9",
+        },
+        .zap = .{
+            .url = "https://github.com/zigzap/zap/archive/76679f308c702cd8880201e6e93914e1d836a54b.tar.gz",
+            .hash = "zap-0.10.6-GoeB8w-EJABTkxyoGH_Z8oMBYMxTBvn7YWk-DrJOHuDO",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src/",
+    },
+}

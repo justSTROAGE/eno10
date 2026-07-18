@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}My Objects — d3pl0y{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <h1>My Objects</h1>
+  <p class="sub">Stored under your namespace <code class="code-inline">{{ session.get('username') }}/</code></p>
+</div>
+
+<div class="stats" style="margin-bottom:20px">
+  <div class="stat"><div class="k">Objects</div><div class="v">{{ count }}</div></div>
+  <div class="stat"><div class="k">Storage used</div><div class="v">{{ total_size | filesizeformat(binary=True) }}</div></div>
+  <div class="stat"><div class="k">Per-object limit</div><div class="v">1 <small>MiB</small></div></div>
+</div>
+
+<div class="card tight stack" style="margin-bottom:20px">
+  <div class="tabs">
+    <input type="radio" name="uptab" id="tab-file" class="tab-radio" checked>
+    <input type="radio" name="uptab" id="tab-hex" class="tab-radio">
+    <div class="tablist">
+      <label for="tab-file" class="tab">Upload a file</label>
+      <label for="tab-hex" class="tab">Write bytes (hex)</label>
+    </div>
+
+    <form class="tabpanel panel-file" method="POST"
+          action="{{ url_for('web.upload') }}" enctype="multipart/form-data">
+      <div class="form-row">
+        <div class="grow">
+          <label class="field" for="f-name">Object name <span class="req">*</span></label>
+          <input id="f-name" name="name" placeholder="name or prefix/name"
+                 pattern="[A-Za-z0-9_./-]{1,64}" maxlength="64" required>
+        </div>
+        <div class="grow">
+          <label class="field" for="f-file">File <span class="req">*</span></label>
+          <input id="f-file" type="file" name="file" required>
+        </div>
+        <button type="submit" class="btn primary">Upload</button>
+      </div>
+      <p class="hint">Uploading to an existing name overwrites it. Max 1&nbsp;MiB.</p>
+    </form>
+
+    <form class="tabpanel panel-hex" method="POST" action="{{ url_for('web.compose') }}">
+      <div class="form-row">
+        <div class="grow">
+          <label class="field" for="h-name">Object name <span class="req">*</span></label>
+          <input id="h-name" name="name" placeholder="prog/hello"
+                 pattern="[A-Za-z0-9_./-]{1,64}" maxlength="64" required>
+        </div>
+        <button type="submit" class="btn primary">Save bytes</button>
+      </div>
+      <label class="field" for="h-hex" style="margin-top:10px">Bytes, as hex</label>
+      <textarea id="h-hex" name="hex" placeholder="01 00 2A 00  04 00 00 00   ; whitespace, commas and 0x are ignored"></textarea>
+      <p class="hint">Author a VM program directly — e.g. <code class="code-inline">01 00 2A 00</code> is
+        <code class="code-inline">push 42</code>. See the <a href="{{ url_for('web.help_page') }}">VM reference</a>.</p>
+    </form>
+  </div>
+</div>
+
+<details class="folder" style="margin-bottom:20px">
+  <summary><span class="chev">▸</span> Prefix sharing
+    <span class="count">grant access to a whole folder at once</span></summary>
+  <div style="padding:4px 14px 14px">
+    <form method="POST" action="{{ url_for('web.share') }}" class="form-row">
+      <input type="hidden" name="scope" value="prefix">
+      <div class="grow">
+        <label class="field" for="p-prefix">Prefix <span class="req">*</span></label>
+        <input id="p-prefix" name="prefix" placeholder="app/" pattern="[A-Za-z0-9_./-]*/"
+               title="Must end with '/'" maxlength="64" required>
+      </div>
+      <div class="grow">
+        <label class="field" for="p-rcv">Receiver <span class="req">*</span></label>
+        <input id="p-rcv" name="receiver" placeholder="username or *public" required>
+      </div>
+      <div>
+        <label class="field" for="p-perm">Permission</label>
+        <select id="p-perm" name="permission">
+          <option value="r">r — read</option>
+          <option value="x">x — execute</option>
+          <option value="w">w — write</option>
+        </select>
+      </div>
+      <div>
+        <label class="field" for="p-eff">Effect</label>
+        <select id="p-eff" name="effect">
+          <option value="allow">allow</option>
+          <option value="deny">deny</option>
+        </select>
+      </div>
+      <button type="submit" class="btn primary">Add rule</button>
+    </form>
+    <p class="hint">Applies to every object whose name starts with the prefix (which must end in
+       <code class="code-inline">/</code>). A more specific rule on a single object overrides this;
+       at equal specificity, <code class="code-inline">deny</code> wins.</p>
+  </div>
+</details>
+
+{% if count == 0 %}
+  <div class="card empty">
+    <div class="big">▤</div>
+    <p>You have no objects yet.</p>
+    <p class="hint">Upload a file or write some bytes above to get started.</p>
+  </div>
+{% else %}
+  {% for folder, items in groups %}
+    {% if folder %}
+      <details class="folder" open>
+        <summary>
+          <span class="chev">▸</span>
+          <span class="mono">{{ folder }}</span>
+          <span class="count">{{ items | length }} object{{ 's' if items|length != 1 }}</span>
+        </summary>
+        <div class="list">
+          {% for o in items %}{% include "_object_row.html" %}{% endfor %}
+        </div>
+      </details>
+    {% else %}
+      <div class="card tight" style="margin-bottom:12px">
+        <div class="list">
+          {% for o in items %}{% include "_object_row.html" %}{% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+{% endblock %}

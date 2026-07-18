@@ -1,0 +1,10 @@
+[build]
+target = "index.html"
+
+[serve]
+port = 4859
+
+[[hooks]]
+stage = "build"
+command = "tailwindcss"
+command_arguments = ["-i", "src/styles/tailwind.css", "-o", "style/tailwind.css"]

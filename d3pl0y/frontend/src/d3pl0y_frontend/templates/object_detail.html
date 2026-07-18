@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}{{ name }} — d3pl0y{% endblock %}
+{% block content %}
+
+<div class="breadcrumb">
+  {% if is_owner %}
+    <a href="{{ url_for('web.objects_page') }}">My Objects</a>
+  {% else %}
+    <a href="{{ url_for('web.shared_page') }}">Shared With Me</a>
+    <span class="sep">/</span><span class="mono">{{ owner }}</span>
+  {% endif %}
+  <span class="sep">/</span><span class="mono">{{ name }}</span>
+</div>
+
+<div class="page-head">
+  <h1 class="mono" style="word-break:break-all">{{ name }}</h1>
+  <p class="sub">
+    Owner <code class="code-inline">{{ owner }}</code>
+    {% if size is not none %}&middot; {{ size | filesizeformat(binary=True) }} ({{ size }} bytes){% endif %}
+  </p>
+</div>
+
+<div class="card tight" style="margin-bottom:18px">
+  <div class="btn-row">
+    {% if can_read %}
+      <a class="btn" href="{{ url_for('web.download', owner=owner, name=name) }}">Download</a>
+    {% endif %}
+    {% if can_exec or can_suid %}
+      <a class="btn run" href="#run">Run program</a>
+    {% endif %}
+    {% if is_owner %}
+      <a class="btn" href="#share">Manage sharing</a>
+    {% endif %}
+    {% if can_write %}
+      <span style="margin-left:auto"></span>
+      <form method="POST" action="{{ url_for('web.delete') }}" style="margin:0">
+        <input type="hidden" name="owner" value="{{ owner }}">
+        <input type="hidden" name="name" value="{{ name }}">
+        <button type="submit" class="btn danger">Delete object</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if can_exec or can_suid %}
+<div class="card stack" id="run" style="margin-bottom:18px">
+  <h2>Run</h2>
+  <p class="hint">Executes the object in the VM and shows its output. The argument is passed
+     to the program (available via <code class="code-inline">getarg</code>).</p>
+  <form method="POST" action="{{ url_for('web.execute') }}" class="form-row">
+    <input type="hidden" name="owner" value="{{ owner }}">
+    <input type="hidden" name="name" value="{{ name }}">
+    <div class="grow">
+      <label class="field" for="arg">Argument</label>
+      <input id="arg" name="argument" value="{{ arg or '' }}" placeholder="(optional)">
+    </div>
+    {% if can_suid and can_exec %}
+    <div>
+      <label class="field" for="suid">Privilege</label>
+      <label class="mode-check"><input type="checkbox" id="suid" name="suid" value="true"> Run as owner</label>
+    </div>
+    {% elif can_suid %}
+    <input type="hidden" name="suid" value="true">
+    {% endif %}
+    <button type="submit" class="btn run">▶ Run</button>
+  </form>
+  {% if can_suid and can_exec %}
+    <p class="hint">Tick <em>Run as owner</em> to execute with
+       <code class="code-inline">{{ owner }}</code>'s permissions (suid) instead of your own.</p>
+  {% elif can_suid %}
+    <p class="hint">You may only execute this as its owner, so it runs with
+       <code class="code-inline">{{ owner }}</code>'s permissions (suid).</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if can_read %}
+<div class="card stack" style="margin-bottom:18px">
+  <div class="card-head">
+    <h2>Program view</h2>
+    <span class="spacer"></span>
+    <span class="hint">{{ vm_mem_note }}</span>
+  </div>
+
+  {% if disrows %}
+  <div>
+    <h3>Disassembly</h3>
+    <div style="overflow:auto">
+    <table class="disasm">
+      <thead><tr><th>addr</th><th>bytes</th><th>instr</th><th>operand</th></tr></thead>
+      <tbody>
+      {% for r in disrows %}
+        <tr>
+          <td class="addr">{{ r.addr }}</td>
+          <td class="bytes">{{ r.raw }}</td>
+          <td class="{{ 'bad' if r.bad else 'mnem' }}">{{ r.mnem }}</td>
+          <td class="{{ 'bad' if r.bad else 'arg' }}">{{ r.arg }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if dis_truncated %}<p class="hint">… disassembly truncated.</p>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if hexdump %}
+  <div>
+    <h3>Hex dump</h3>
+    <pre class="block">{{ hexdump }}</pre>
+    {% if hex_truncated %}<p class="hint">… showing the first {{ vmcode_hex_limit }} of {{ size }} bytes.</p>{% endif %}
+  </div>
+  {% else %}
+    <p class="muted">This object is empty.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if is_owner %}
+<div class="card stack" id="share">
+  <h2>Sharing</h2>
+
+  <div>
+    <h3>Rules affecting this object</h3>
+    {% if shares %}
+    <table class="ref">
+      <thead><tr><th>Receiver</th><th>Scope</th><th>Match</th><th>Perm</th><th>Effect</th><th></th></tr></thead>
+      <tbody>
+      {% for s in shares %}
+        <tr>
+          <td><code>{{ 'everyone' if s.receiver == '*public' else s.receiver }}</code></td>
+          <td>{{ s.scope }}</td>
+          <td><code>{{ s.prefix }}{{ '*' if s.scope == 'prefix' }}</code></td>
+          <td><span class="perm"><span class="p {{ s.permission }} on">{{ s.permission }}</span></span></td>
+          <td><span class="tag-effect {{ s.effect }}">{{ s.effect }}</span></td>
+          <td style="text-align:right">
+            <form method="POST" action="{{ url_for('web.delete_share') }}" style="margin:0">
+              <input type="hidden" name="prefix" value="{{ s.prefix }}">
+              <input type="hidden" name="scope" value="{{ s.scope }}">
+              <input type="hidden" name="receiver" value="{{ s.receiver }}">
+              <input type="hidden" name="permission" value="{{ s.permission }}">
+              <input type="hidden" name="effect" value="{{ s.effect }}">
+              <button type="submit" class="btn sm ghost">Revoke</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted">No sharing rules apply — this object is private to you.</p>
+    {% endif %}
+  </div>
+
+  <div>
+    <h3>Share this object</h3>
+    <form method="POST" action="{{ url_for('web.share') }}" class="form-row">
+      <input type="hidden" name="prefix" value="{{ name }}">
+      <input type="hidden" name="scope" value="exact">
+      <div class="grow">
+        <label class="field" for="rcv">Receiver</label>
+        <input id="rcv" name="receiver" placeholder="username" required>
+      </div>
+      <div>
+        <label class="field" for="perm">Permission</label>
+        <select id="perm" name="permission">
+          <option value="r">r — read</option>
+          <option value="x">x — execute</option>
+          <option value="w">w — write</option>
+          <option value="s">s — execute as owner (suid)</option>
+        </select>
+      </div>
+      <div>
+        <label class="field" for="eff">Effect</label>
+        <select id="eff" name="effect">
+          <option value="allow">allow</option>
+          <option value="deny">deny</option>
+        </select>
+      </div>
+      <button type="submit" class="btn primary">Add rule</button>
+    </form>
+    <p class="hint">Grants apply to this exact object. To share a whole folder, use
+       <em>Prefix sharing</em> on the <a href="{{ url_for('web.objects_page') }}">My Objects</a> page.</p>
+  </div>
+
+  <div>
+    <form method="POST" action="{{ url_for('web.make_public') }}" style="margin:0">
+      <input type="hidden" name="name" value="{{ name }}">
+      <button type="submit" class="btn">Make public (read + execute for everyone)</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

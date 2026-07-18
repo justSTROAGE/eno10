@@ -1,0 +1,22 @@
+services:
+  inbox:
+    build: .
+    volumes:
+      - ./maildir/:/maildir:rw
+    ports:
+      - "1234:1234"
+      - "4321:4321"
+    restart: unless-stopped
+    mem_limit: 4g
+    cpus: 2
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    logging:
+      driver: json-file
+      options:
+        mode: non-blocking
+        max-buffer-size: 4m
+        max-size: 10m
+        max-file: "3"

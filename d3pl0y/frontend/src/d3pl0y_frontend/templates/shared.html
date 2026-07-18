@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Shared With Me — d3pl0y{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Shared With Me</h1>
+  <p class="sub">Objects other users have granted you access to.</p>
+</div>
+
+{% if shared_groups %}
+  {% for owner, items in shared_groups %}
+  <div class="card tight" style="margin-bottom:14px">
+    <div class="card-head">
+      <span class="userchip" style="background:var(--surface-2);color:var(--text);border-color:var(--border)">
+        <span class="avatar">{{ owner[0] }}</span>{{ owner }}
+      </span>
+      <span class="count muted" style="margin-left:auto">{{ items|length }} object{{ 's' if items|length != 1 }}</span>
+    </div>
+    <div class="list">
+      {% for o in items %}
+      <div class="obj-row">
+        <span class="icon" aria-hidden="true">▤</span>
+        <a class="name" href="{{ url_for('web.object_detail', owner=owner, name=o.name) }}">{{ o.name }}</a>
+        <div class="meta">
+          <span class="perm">
+            <span class="p r {{ 'on' if 'r' in o.perms }}">r</span>
+            <span class="p w {{ 'on' if 'w' in o.perms }}">w</span>
+            <span class="p x {{ 'on' if 'x' in o.perms }}">x</span>
+            <span class="p s {{ 'on' if 's' in o.perms }}">s</span>
+          </span>
+          <div class="actions">
+            {% if 'x' in o.perms %}
+              <a class="btn sm run" href="{{ url_for('web.object_detail', owner=owner, name=o.name) }}#run">Run</a>
+            {% elif 's' in o.perms %}
+              <a class="btn sm run" href="{{ url_for('web.object_detail', owner=owner, name=o.name) }}#run">Run as owner</a>
+            {% endif %}
+            {% if 'r' in o.perms %}
+              <a class="btn sm" href="{{ url_for('web.download', owner=owner, name=o.name) }}">Download</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if next_after or paged %}
+  <div class="btn-row" style="justify-content:space-between;align-items:center">
+    <span class="muted">{{ count }} object{{ 's' if count != 1 }} on this page</span>
+    <span class="btn-row">
+      {% if paged %}
+        <a class="btn sm" href="{{ url_for('web.shared_page') }}">First page</a>
+      {% endif %}
+      {% if next_after %}
+        <a class="btn sm primary" href="{{ url_for('web.shared_page', after=next_after) }}">Next →</a>
+      {% endif %}
+    </span>
+  </div>
+  {% endif %}
+{% elif paged %}
+  <div class="card empty">
+    <div class="big">⇄</div>
+    <p>Nothing further on this page.</p>
+    <p class="hint"><a href="{{ url_for('web.shared_page') }}">Back to the first page</a></p>
+  </div>
+{% else %}
+  <div class="card empty">
+    <div class="big">⇄</div>
+    <p>Nothing has been shared with you yet.</p>
+    <p class="hint">When another user grants you access to one of their objects, it shows up here.</p>
+  </div>
+{% endif %}
+{% endblock %}

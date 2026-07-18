@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-gov-red: #d32f2f;
+  --color-gov-red-dark: #b71c1c;
+  --color-gov-red-light: #ef5350;
+  --color-gov-bg-light: #f8fafc;
+  --color-gov-bg-dark: #121212;
+  --color-gov-surface-light: #ffffff;
+  --color-gov-surface-dark: #1e1e1e;
+}
+
+@layer base {
+  body {
+    @apply bg-gov-bg-light text-neutral-800 dark:bg-gov-bg-dark dark:text-neutral-200 antialiased min-h-screen flex flex-col font-sans transition-colors duration-300;
+  }
+}

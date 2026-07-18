@@ -1,0 +1,10 @@
+services:
+  d3pl0y:
+    build: .
+    ports:
+      - "2553:2553"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    mem_limit: 4g
+    cpus: 2

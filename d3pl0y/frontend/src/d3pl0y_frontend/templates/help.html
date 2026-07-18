@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}API &amp; VM Reference — d3pl0y{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>API &amp; VM Reference</h1>
+  <p class="sub">Everything the web UI does is also available over a small HTTP API.</p>
+</div>
+
+<div class="card stack" style="margin-bottom:18px">
+  <h2>Authentication</h2>
+  <p>Register a username to receive a secret token. Authenticate API requests with
+     <strong>HTTP Basic</strong> auth — <code class="code-inline">username</code> as the user and
+     your <code class="code-inline">token</code> as the password.</p>
+  <pre class="block">Authorization: Basic base64("&lt;username&gt;:&lt;token&gt;")</pre>
+</div>
+
+<div class="card stack" style="margin-bottom:18px">
+  <h2>Object API — <code class="code-inline">/user/&lt;owner&gt;/&lt;objectname&gt;</code></h2>
+  <table class="ref">
+    <thead><tr><th>Method</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET</code></td><td>Download the object's bytes.</td></tr>
+      <tr><td><code>PUT</code></td><td>Create or overwrite the object (request body = bytes).</td></tr>
+      <tr><td><code>DELETE</code></td><td>Delete the object.</td></tr>
+      <tr><td><code>POST</code></td><td>Run an action (JSON body), one of:</td></tr>
+    </tbody>
+  </table>
+  <pre class="block">{"action": "execute", "argument": "&lt;str&gt;"}
+{"action": "make_public"}
+{"action": "set_permission", "scope": "exact|prefix",
+ "receiver": "&lt;username&gt;|*public", "permission": "r|w|x", "effect": "allow|deny"}</pre>
+  <h3>Examples</h3>
+  <pre class="block">curl -u "alice:$TOKEN" -X PUT --data-binary @prog.bin http://HOST:2553/user/alice/hello
+curl -u "alice:$TOKEN" http://HOST:2553/user/alice/hello
+curl -u "alice:$TOKEN" -H 'Content-Type: application/json' \
+     -d '{"action":"execute","argument":"world"}' http://HOST:2553/user/alice/hello</pre>
+</div>
+
+<div class="card stack" style="margin-bottom:18px">
+  <h2>Access control</h2>
+  <p>An object is <code class="code-inline">(owner, name)</code>; <code class="code-inline">name</code> may
+     contain <code class="code-inline">/</code> to form prefix folders, but storage is flat. Owners always have
+     full <code class="code-inline">r/w/x</code> on their own objects. Every grant is one rule:</p>
+  <ul class="muted">
+    <li><strong>scope</strong> — <code class="code-inline">exact</code> (one object) or
+        <code class="code-inline">prefix</code> (a folder; the prefix must end in <code class="code-inline">/</code>).</li>
+    <li><strong>receiver</strong> — a username, or <code class="code-inline">*public</code> for everyone.</li>
+    <li><strong>permission</strong> — <code class="code-inline">r</code>ead / <code class="code-inline">w</code>rite / e<code class="code-inline">x</code>ecute.</li>
+    <li><strong>effect</strong> — <code class="code-inline">allow</code> or <code class="code-inline">deny</code>.</li>
+  </ul>
+  <p class="hint">Resolution: the most specific rule wins (longest matching prefix); at equal
+     specificity, <code class="code-inline">deny</code> beats <code class="code-inline">allow</code>.</p>
+</div>
+
+<div class="card stack">
+  <div class="card-head">
+    <h2>VM instruction set</h2>
+    <span class="spacer"></span>
+    <span class="hint">4 bytes each: opcode · flags · operand (u16, LE)</span>
+  </div>
+  <p class="hint">Programs run in a stack machine with 1024 bytes of memory and a 256-word stack.
+     Stack effects are written <code class="code-inline">( before -- after )</code>, top on the right.</p>
+  <table class="ref">
+    <thead><tr><th>Op</th><th>Mnemonic</th><th>Stack</th><th>Description</th></tr></thead>
+    <tbody>
+    {% for op, mnem, stack, desc in ops %}
+      <tr>
+        <td><code>0x{{ '%02X' % op }}</code></td>
+        <td><code>{{ mnem }}</code></td>
+        <td><code>{{ stack }}</code></td>
+        <td>{{ desc }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

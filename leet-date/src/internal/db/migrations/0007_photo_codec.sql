@@ -1,0 +1,2 @@
+ALTER TABLE photos
+    ADD COLUMN IF NOT EXISTS is_compressed BOOLEAN NOT NULL DEFAULT false;

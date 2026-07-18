@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}d3pl0y{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%234f46e5'/><text x='8' y='12' font-size='10' font-family='monospace' fill='white' text-anchor='middle'>d</text></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{{ url_for('web.index') }}">
+        <span class="logo">d3pl0y</span>
+        <span class="tag">Cloud Platform</span>
+      </a>
+      <nav class="topnav" aria-label="Primary">
+        {% if session.get('username') %}
+          <a href="{{ url_for('web.objects_page') }}" class="{{ 'active' if nav == 'objects' }}">My Objects</a>
+          <a href="{{ url_for('web.shared_page') }}" class="{{ 'active' if nav == 'shared' }}">Shared With Me</a>
+          <a href="{{ url_for('web.help_page') }}" class="{{ 'active' if nav == 'help' }}">API &amp; VM</a>
+          <span class="userchip">
+            <span class="avatar">{{ session.get('username')[0] }}</span>
+            {{ session.get('username') }}
+            <a class="logout" href="{{ url_for('web.logout') }}">Log out</a>
+          </span>
+        {% else %}
+          <a href="{{ url_for('web.help_page') }}" class="{{ 'active' if nav == 'help' }}">API &amp; VM</a>
+          <a href="{{ url_for('web.login_form') }}" class="{{ 'active' if nav == 'login' }}">Log in</a>
+          <a href="{{ url_for('web.register_form') }}" class="btn primary sm">Register</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container {{ container_class or '' }}">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flashes">
+            {% for category, message in messages %}
+              <div class="alert {{ category }}">
+                <span>{{ message }}</span>
+                <button type="button" class="x" aria-label="Dismiss">&times;</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="footer">
+    d3pl0y &middot; store, share &amp; execute objects &middot;
+    <a href="{{ url_for('web.help_page') }}">API &amp; VM reference</a>
+  </footer>
+
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
+{% block appendix %}{% endblock %}

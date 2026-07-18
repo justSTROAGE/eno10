@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}d3pl0y — Cloud Platform{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Your government-provided cloud platform.</h1>
+  <p class="lede">
+    Register an account, store your binary <strong>objects</strong>, share them with
+    precise permissions, and execute them as programs in the d3pl0y virtual machine.
+  </p>
+  <div class="btn-row">
+    <a class="btn primary" href="{{ url_for('web.register_form') }}">Create an account</a>
+    <a class="btn" href="{{ url_for('web.login_form') }}">Log in</a>
+  </div>
+</section>
+
+<div class="features">
+  <div class="card feature">
+    <div class="ic">▤</div>
+    <h3>Store</h3>
+    <p>Upload objects up to 1&nbsp;MiB each. Names may contain <code class="code-inline">/</code>
+       so you can organise them into prefix folders.</p>
+  </div>
+  <div class="card feature">
+    <div class="ic">⇄</div>
+    <h3>Share</h3>
+    <p>Grant <code class="code-inline">r</code>/<code class="code-inline">w</code>/<code class="code-inline">x</code>
+       to a specific user or the public — by exact name or whole prefix, allow or deny.</p>
+  </div>
+  <div class="card feature">
+    <div class="ic">▶</div>
+    <h3>Execute</h3>
+    <p>Objects are programs for a stack-based VM. Run one with an argument and read its
+       output, right from the browser.</p>
+  </div>
+</div>
+
+<div class="card stack" style="margin-top:18px">
+  <h2>How it works</h2>
+  <p class="muted">
+    Everything you can do here is also available over a small HTTP API (HTTP Basic auth)
+    so machine clients can drive the same service. After you register you'll receive a
+    secret token — that token is your password for both the web UI and the API.
+  </p>
+  <div class="btn-row">
+    <a class="btn sm" href="{{ url_for('web.help_page') }}">Read the API &amp; VM reference →</a>
+  </div>
+</div>
+{% endblock %}

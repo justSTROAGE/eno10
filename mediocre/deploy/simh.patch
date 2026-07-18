@@ -1,0 +1,100 @@
+diff -ruN a/PDP11/pdp11_cpu.c b/PDP11/pdp11_cpu.c
+--- a/PDP11/pdp11_cpu.c	2026-07-08 23:19:38.026381543 +0200
++++ b/PDP11/pdp11_cpu.c	2026-07-08 23:19:38.049874845 +0200
+@@ -977,6 +977,7 @@
+         MMR2 = PC;
+         }
+     IR = ReadE (PC | isenable);                         /* fetch instruction */
++if ((IR == 0005037) && (ReadE (((PC + 2) & 0177777) | isenable) == 0177776)) sim_idle (TMR_CLK, TRUE);
+     sim_interval = sim_interval - 1;
+     srcspec = (IR >> 6) & 077;                          /* src, dst specs */
+     dstspec = IR & 077;
+diff -ruN a/sim_ether.c b/sim_ether.c
+--- a/sim_ether.c	2026-07-08 23:19:38.013280766 +0200
++++ b/sim_ether.c	2026-07-08 23:19:38.033358144 +0200
+@@ -2357,7 +2357,7 @@
+     struct vde_open_args voa;
+     const char *devname = savname + 4;
+ 
+-    memset(&voa, 0, sizeof(voa));
++    memset(&voa, 0, sizeof(voa)); voa.mode = 0700;
+     if (!strcmp(savname, "vde:vdedevice"))
+       return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\n");
+     while (isspace(*devname))
+diff -ruN a/sim_sock.c b/sim_sock.c
+--- a/sim_sock.c	2026-07-08 23:19:38.018263868 +0200
++++ b/sim_sock.c	2026-07-08 23:19:38.045919993 +0200
+@@ -1067,7 +1067,7 @@
+     sta = setsockopt (newsock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&off, sizeof(off));
+     }
+ #endif
+-if (opt_flags & SIM_SOCK_OPT_REUSEADDR) {
++if (1) {
+     int on = 1;
+ 
+     sta = setsockopt (newsock, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
+diff -ruN a/sim_tmxr.c b/sim_tmxr.c
+--- a/sim_tmxr.c	2026-07-08 23:19:38.021565480 +0200
++++ b/sim_tmxr.c	2026-07-09 00:13:22.335812814 +0200
+@@ -1063,6 +1063,19 @@
+ 
+ */
+ 
++/* Min idle ms before a freed modem line is re-offered (reuse-settle).
++   Runtime-tunable via env TMXR_REUSE_SETTLE_MS for empirical sizing; default 500. */
++static uint32 tmxr_reuse_settle_ms (void)
++{
++static int cached = -1;
++if (cached < 0) {
++    const char *e = getenv ("TMXR_REUSE_SETTLE_MS");
++    cached = (e && *e) ? atoi (e) : 500;
++    if (cached < 0) cached = 0;
++    }
++return (uint32)cached;
++}
++
+ int32 tmxr_poll_conn (TMXR *mp)
+ {
+ SOCKET newsock;
+@@ -1113,7 +1126,7 @@
+     }
+ 
+ if (sim_is_running &&
+-    ((poll_time - mp->last_poll_time) < mp->poll_interval*1000))
++    ((poll_time - mp->last_poll_time) < mp->poll_interval*0))
+     return -1;                                          /* too soon to try */
+ 
+ srand((unsigned int)poll_time);
+@@ -1157,13 +1170,22 @@
+                 if (op && (*op >= 0) && (*op < mp->lines))  /* order list present and valid? */
+                     i = *op++;                              /* get next line in list to try */
+                 else                                        /* no list or not used or range error */
+-                    i = j;                                  /* get next sequential line */
++                    i = (j + mp->sessions) % mp->lines;                                  /* get next sequential line */
+ 
+                 lp = mp->ldsc + i;                          /* get pointer to line descriptor */
+                 if ((lp->conn == FALSE) &&                  /* is the line available? */
+                     (lp->destination == NULL) &&
+                     (lp->master == 0) &&
+                     (lp->ser_connect_pending == FALSE) &&
++                    /* Reuse-settle: don't re-offer a just-freed modem line until
++                       it has been idle >= TMXR_REUSE_SETTLE_MS. DSM-11's ^MUX
++                       drops DTR on hangup and re-arms a line lazily; reusing a
++                       line still mid-teardown loses the login-job spawn (no
++                       banner). Skipping recently-freed lines forces poll_conn to
++                       ring a fully-idle line instead, which ^MUX answers cleanly.
++                       cnms==0 = never connected (immediately usable). */
++                    ((!lp->modem_control) || (lp->cnms == 0) ||
++                     ((sim_os_msec () - lp->cnms) >= tmxr_reuse_settle_ms ())) &&
+                     (lp->modem_control ? ((lp->modembits & TMXR_MDM_DTR) != 0) : TRUE))
+                     break;                                  /* yes, so stop search */
+                 }
+@@ -1458,7 +1480,7 @@
+         lp->telnet_sent_opts = NULL;
+         lp->sock = 0;
+         lp->conn = FALSE;
+-        lp->cnms = 0;
++        lp->cnms = sim_os_msec ();    /* reuse-settle: stamp disconnect time (see tmxr_poll_conn) */
+         lp->xmte = 1;
+         }
+ free(lp->ipad);

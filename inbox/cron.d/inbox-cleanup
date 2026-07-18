@@ -1,0 +1,1 @@
+*/3 * * * * service /cleanup.sh /maildir >/dev/null 2>&1

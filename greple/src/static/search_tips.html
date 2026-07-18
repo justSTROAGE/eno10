@@ -1,0 +1,52 @@
+<a name="basic"><b>Basic Search</b></a>
+<p>To enter a query into Greple, just type in a few descriptive words and hit
+the 'enter' key (or click on the Greple Search button) for your list of
+relevant results.</p>
+<p>Greple performs a literal text search across the pages it has indexed and
+returns the pages whose content best matches your query.</p>
+<a name="phrase"><b>Multi-word Searches</b></a>
+<p>When you enter more than one word, Greple looks for pages where those words
+appear next to each other, in the order you typed them. Words may be separated
+by any combination of whitespace or punctuation in the page, but no other words
+are allowed between them.</p>
+<p>For example, to find pages about a vacation in Hawaii, simply type</p>
+<form action="/search" style="margin-bottom: 1rem">
+  <input name="q" size="32" value="vacation hawaii">
+  <input type="submit" value="Greple Search" name="btnG">
+</form>
+<a name="user"><b>User Search</b></a>
+<p>To restrict your search to the pages submitted by a single user, prefix a
+username with <code>user:</code>. The <code>user:</code> term may appear
+anywhere in your query and is not itself part of the phrase that Greple looks
+for in the page. Usernames are alphanumeric.</p>
+<p>For example, to search for pages about vacations submitted by alice:</p>
+<form action="/search" style="margin-bottom: 1rem">
+  <input name="q" size="32" value="user:alice vacation hawaii">
+  <input type="submit" value="Greple Search" name="btnG">
+</form>
+<a name="context"><b>See your search terms in context</b></a>
+<p>Each Greple search result contains a short excerpt from the matching page,
+which shows how your search terms are used in context on that page. This lets
+you tell at a glance whether the result is a page you want to visit.</p>
+<a name="stemming"><b>Stemming and Wildcards</b></a>
+<p>To provide the most predictable results, Greple does not use "stemming" or
+support "wildcard" searches. In other words, Greple searches for exactly the
+words that you enter in the search box. Searching for "grepl" or "grepl*" will
+not yield "grepler" or "greplin." If in doubt, try both forms: "airline" and
+"airlines," for instance.</p>
+<a name="case"><b>Does capitalization matter?</b></a>
+<p>Greple searches are <b>not</b> case sensitive. All letters, regardless of how
+you type them, will be understood as lower case. For example, searches for
+"george washington", "George Washington", and "gEoRgE wAsHiNgToN" will all
+return the same results.</p>
+<a name="lucky"><b>I'm Feeling Lucky</b></a>
+<p>Next to the Greple Search button you'll find an "I'm Feeling Lucky" button.
+When you click it, Greple takes you straight to the top-ranked result for your
+query, skipping the list of results entirely. It's the fastest way to reach a
+page when you're confident your query identifies it uniquely.</p>
+<p>If your query returns no results, the "I'm Feeling Lucky" button behaves the
+same as Greple Search and shows the (empty) results page instead.</p>
+<form action="/search" style="margin-bottom: 1rem">
+  <input name="q" size="32" value="vacation hawaii">
+  <input type="submit" value="I'm Feeling Lucky" name="btnI">
+</form>

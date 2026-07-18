@@ -1,0 +1,11 @@
+target/
+backend/target/
+frontend/target/
+shared/target/
+
+frontend/dist/
+frontend/node_modules/
+
+.gitignore
+docker-compose.yml
+Dockerfile

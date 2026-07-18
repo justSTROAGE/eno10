@@ -1,0 +1,19 @@
+[project]
+name = "d3pl0y-frontend"
+version = "0.1.0"
+dependencies = [
+    "fastapi==0.139.0",
+    "uvicorn[standard]==0.51.0",
+    "gunicorn==26.0.0",
+    "aiosqlite==0.22.1",
+    "aiosqlitepool==1.0.0",
+    "jinja2==3.1.6",
+    "python-multipart==0.0.32",
+    "itsdangerous==2.2.0",
+]
+
+[project.scripts]
+d3pl0y-reaper = "d3pl0y_frontend.cleanup:main"
+
+[tool.setuptools.package-data]
+"d3pl0y_frontend" = ["static/**/*", "templates/**/*"]

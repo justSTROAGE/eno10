@@ -1,0 +1,215 @@
+x-vol-vde: &vol-vde       vde-sock:/vde
+x-vol-runner: &vol-runner ./deploy/sim-runner.py:/opt/sim-runner.py:ro
+x-vol-storage-ini: &vol-storage-ini ./deploy/storage.ini:/opt/simh/storage.ini:ro
+x-vol-terminal-ini: &vol-terminal-ini ./deploy/terminal.ini:/opt/simh/terminal.ini:ro
+x-vol-terminal-healthcheck: &vol-terminal-healthcheck ./deploy/terminal-healthcheck.py:/opt/terminal-healthcheck.py:ro
+x-vol-vde-healthcheck: &vol-vde-healthcheck ./deploy/vde-healthcheck.py:/opt/vde-healthcheck.py:ro
+
+x-simh-base: &simh-base
+  build: ./deploy
+  image: mediocre-simh:latest
+  restart: unless-stopped
+  stop_grace_period: 30s
+  entrypoint: ["/opt/sim-runner.py"]
+
+x-terminal-base: &terminal-base
+  <<: *simh-base
+  depends_on:
+    vde:
+      condition: service_healthy
+    storage:
+      condition: service_started
+  cpus: 0.40
+  mem_limit: 256m
+  healthcheck:
+    test: ["CMD", "python3", "/opt/terminal-healthcheck.py"]
+    interval: 5s
+    timeout: 6s
+    retries: 3
+    start_period: 90s
+
+services:
+  vde:
+    <<: *simh-base
+    entrypoint: ["/opt/vde-entrypoint.sh"]
+    volumes:
+      - *vol-vde
+      - ./deploy/vde-entrypoint.sh:/opt/vde-entrypoint.sh:ro
+      - *vol-vde-healthcheck
+    cpus: 0.10
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD", "python3", "/opt/vde-healthcheck.py"]
+      interval: 5s
+      timeout: 10s
+      retries: 6
+      start_period: 10s
+
+  storage:
+    <<: *simh-base
+    depends_on:
+      vde:
+        condition: service_healthy
+    environment:
+      SIM_INI: /opt/simh/storage.ini
+      SIM_PORT: "4100"
+      SIM_XU_MAC: "08:00:2B:00:00:01"
+    volumes:
+      - *vol-vde
+      - *vol-runner
+      - *vol-storage-ini
+      - ./state/storage:/sim/state
+    ports:
+      - "127.0.0.1:4100:4100"
+    cpus: 0.35
+    mem_limit: 256m
+
+  terminal-1:
+    <<: *terminal-base
+    environment:
+      SIM_INI: /opt/simh/terminal.ini
+      SIM_PORT: "4101"
+      SIM_XU_MAC: "08:00:2B:00:00:02"
+    volumes:
+      - *vol-vde
+      - *vol-runner
+      - *vol-terminal-ini
+      - *vol-terminal-healthcheck
+      - ./state/terminal-1:/sim/state
+    ports:
+      - "127.0.0.1:4101:4101"
+
+  terminal-2:
+    <<: *terminal-base
+    environment:
+      SIM_INI: /opt/simh/terminal.ini
+      SIM_PORT: "4102"
+      SIM_XU_MAC: "08:00:2B:00:00:03"
+    volumes:
+      - *vol-vde
+      - *vol-runner
+      - *vol-terminal-ini
+      - *vol-terminal-healthcheck
+      - ./state/terminal-2:/sim/state
+    ports:
+      - "127.0.0.1:4102:4102"
+
+  terminal-3:
+    <<: *terminal-base
+    environment:
+      SIM_INI: /opt/simh/terminal.ini
+      SIM_PORT: "4103"
+      SIM_XU_MAC: "08:00:2B:00:00:04"
+    volumes:
+      - *vol-vde
+      - *vol-runner
+      - *vol-terminal-ini
+      - *vol-terminal-healthcheck
+      - ./state/terminal-3:/sim/state
+    ports:
+      - "127.0.0.1:4103:4103"
+
+  terminal-4:
+    <<: *terminal-base
+    environment:
+      SIM_INI: /opt/simh/terminal.ini
+      SIM_PORT: "4104"
+      SIM_XU_MAC: "08:00:2B:00:00:05"
+    volumes:
+      - *vol-vde
+      - *vol-runner
+      - *vol-terminal-ini
+      - *vol-terminal-healthcheck
+      - ./state/terminal-4:/sim/state
+    ports:
+      - "127.0.0.1:4104:4104"
+
+  terminal-5:
+    <<: *terminal-base
+    environment:
+      SIM_INI: /opt/simh/terminal.ini
+      SIM_PORT: "4105"
+      SIM_XU_MAC: "08:00:2B:00:00:06"
+    volumes:
+      - *vol-vde
+      - *vol-runner
+      - *vol-terminal-ini
+      - *vol-terminal-healthcheck
+      - ./state/terminal-5:/sim/state
+    ports:
+      - "127.0.0.1:4105:4105"
+
+  terminal-6:
+    <<: *terminal-base
+    environment:
+      SIM_INI: /opt/simh/terminal.ini
+      SIM_PORT: "4106"
+      SIM_XU_MAC: "08:00:2B:00:00:07"
+    volumes:
+      - *vol-vde
+      - *vol-runner
+      - *vol-terminal-ini
+      - *vol-terminal-healthcheck
+      - ./state/terminal-6:/sim/state
+    ports:
+      - "127.0.0.1:4106:4106"
+
+  terminal-7:
+    <<: *terminal-base
+    environment:
+      SIM_INI: /opt/simh/terminal.ini
+      SIM_PORT: "4107"
+      SIM_XU_MAC: "08:00:2B:00:00:08"
+    volumes:
+      - *vol-vde
+      - *vol-runner
+      - *vol-terminal-ini
+      - *vol-terminal-healthcheck
+      - ./state/terminal-7:/sim/state
+    ports:
+      - "127.0.0.1:4107:4107"
+
+  terminal-8:
+    <<: *terminal-base
+    environment:
+      SIM_INI: /opt/simh/terminal.ini
+      SIM_PORT: "4108"
+      SIM_XU_MAC: "08:00:2B:00:00:09"
+    volumes:
+      - *vol-vde
+      - *vol-runner
+      - *vol-terminal-ini
+      - *vol-terminal-healthcheck
+      - ./state/terminal-8:/sim/state
+    ports:
+      - "127.0.0.1:4108:4108"
+
+  haproxy:
+    image: haproxy:alpine
+    restart: unless-stopped
+    depends_on:
+      terminal-1:
+        condition: service_healthy
+      terminal-2:
+        condition: service_healthy
+      terminal-3:
+        condition: service_healthy
+      terminal-4:
+        condition: service_healthy
+      terminal-5:
+        condition: service_healthy
+      terminal-6:
+        condition: service_healthy
+      terminal-7:
+        condition: service_healthy
+      terminal-8:
+        condition: service_healthy
+    volumes:
+      - ./deploy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "1980:1980"
+    cpus: 0.05
+    mem_limit: 64m
+
+volumes:
+  vde-sock:

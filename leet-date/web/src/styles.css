@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme {
+  --font-sans: ui-monospace, "JetBrains Mono", "Fira Code", "SFMono-Regular",
+    Menlo, Consolas, "Liberation Mono", monospace;
+  --font-mono: ui-monospace, "JetBrains Mono", "Fira Code", "SFMono-Regular",
+    Menlo, Consolas, "Liberation Mono", monospace;
+
+  --color-brand-50:  #eafff6;
+  --color-brand-100: #c8ffe8;
+  --color-brand-200: #133a2c;
+  --color-brand-300: #6cffc0;
+  --color-brand-400: #2bffab;
+  --color-brand-500: #00ff9c;
+  --color-brand-600: #00e08a;
+  --color-brand-700: #00b36e;
+  --color-brand-800: #0a3324;
+  --color-brand-900: #05231a;
+
+  --color-ink-50:  #e7fff4;
+  --color-ink-100: #cfeee2;
+  --color-ink-200: #b0d6c8;
+  --color-ink-300: #86b3a5;
+  --color-ink-400: #5e7f74;
+  --color-ink-500: #42605a;
+  --color-ink-600: #1d2c34;
+  --color-ink-700: #132029;
+  --color-ink-800: #0a141b;
+  --color-ink-900: #050b11;
+  --color-ink-950: #02060a;
+}
+
+@layer base {
+  html, body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--color-ink-950);
+    color: var(--color-ink-50);
+    font-family: var(--font-mono);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :root,
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  body {
+    position: relative;
+    background-color: var(--color-ink-950);
+    background-image:
+      radial-gradient(1100px 620px at 78% -12%, rgba(0, 255, 156, 0.10), transparent 60%),
+      radial-gradient(900px 560px at 8% 108%, rgba(0, 224, 255, 0.08), transparent 60%),
+      linear-gradient(rgba(0, 255, 156, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 156, 0.035) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 34px 34px, 34px 34px;
+    background-attachment: fixed;
+  }
+
+  /* Scanline overlay: pure decoration, never blocks clicks. */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.16) 3px,
+      rgba(0, 0, 0, 0) 4px
+    );
+    mix-blend-mode: multiply;
+    opacity: 0.5;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  ::selection {
+    background: var(--color-brand-500);
+    color: var(--color-ink-950);
+  }
+
+  input, textarea, select, button { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  input::placeholder, textarea::placeholder { color: var(--color-ink-400); }
+}
+
+@layer components {
+  /* The neon gradient that defines the brand identity. Dark ink text so it
+     stays legible over the bright fill; children inherit via currentColor. */
+  .brand-gradient {
+    background-image: linear-gradient(135deg, #00ffa3 0%, #00ff9c 45%, #00e0ff 100%);
+    color: var(--color-ink-950) !important;
+    box-shadow: 0 0 18px rgba(0, 255, 156, 0.35), inset 0 0 0 1px rgba(0, 255, 156, 0.5);
+  }
+
+  .brand-text {
+    background-image: linear-gradient(135deg, #2bffab 0%, #00ff9c 50%, #00e0ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 10px rgba(0, 255, 156, 0.45));
+  }
+
+  /* Glitchy flicker for the wordmark. */
+  .glitch {
+    animation: glitch-flicker 4.5s infinite steps(1);
+  }
+
+  @keyframes glitch-flicker {
+    0%, 92%, 100% { opacity: 1; transform: translateX(0); }
+    93% { opacity: 0.7; transform: translateX(-1px); }
+    94% { opacity: 1; transform: translateX(1px); }
+    95% { opacity: 0.6; transform: translateX(0); }
+    96% { opacity: 1; transform: translateX(-1px); }
+  }
+
+  /* Blinking terminal cursor. */
+  .caret::after {
+    content: "_";
+    margin-left: 1px;
+    color: var(--color-brand-500);
+    animation: caret-blink 1.05s steps(1) infinite;
+    text-shadow: 0 0 8px rgba(0, 255, 156, 0.6);
+  }
+
+  @keyframes caret-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+
+  /* PhotoUploader drag-over highlight: used by JS-applied classes. */
+  .photo-tile-dragging { opacity: 0.4; }
+  .photo-tile-drag-over {
+    outline: 2px solid var(--color-brand-500);
+    box-shadow: 0 0 14px rgba(0, 255, 156, 0.5);
+    transform: scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glitch, .caret::after { animation: none; }
+}

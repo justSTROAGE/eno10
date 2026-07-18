@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Execution result — d3pl0y{% endblock %}
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('web.object_detail', owner=owner, name=name) }}" class="mono">{{ owner }}/{{ name }}</a>
+  <span class="sep">/</span> run
+</div>
+
+<div class="page-head">
+  <h1>Execution result</h1>
+  <p class="sub">
+    Ran <code class="code-inline">{{ owner }}/{{ name }}</code>
+    with argument <code class="code-inline">{{ arg if arg != '' else '(empty)' }}</code>
+  </p>
+</div>
+
+<div class="card stack">
+  <div class="card-head">
+    <h2>Output</h2>
+    <span class="spacer"></span>
+    <span class="hint">{{ output | length }} byte{{ 's' if output|length != 1 }} on stdout</span>
+  </div>
+  {% if output %}
+    <pre class="block">{{ output }}</pre>
+  {% else %}
+    <p class="muted">The program produced no output (it halted without calling <code class="code-inline">return</code>).</p>
+  {% endif %}
+  <div class="btn-row">
+    <a class="btn run" href="{{ url_for('web.object_detail', owner=owner, name=name) }}#run">Run again</a>
+    <a class="btn" href="{{ url_for('web.objects_page') }}">Back to My Objects</a>
+  </div>
+</div>
+{% endblock %}

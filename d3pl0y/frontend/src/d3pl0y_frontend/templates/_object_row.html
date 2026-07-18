@@ -1,0 +1,17 @@
+<div class="obj-row">
+  <span class="icon" aria-hidden="true">▤</span>
+  <a class="name" href="{{ url_for('web.object_detail', owner=session.get('username'), name=o.name) }}">{{ o.name }}</a>
+  <div class="meta">
+    <span class="size">{{ o.size | filesizeformat(binary=True) }}</span>
+    <div class="actions">
+      <a class="btn sm run" href="{{ url_for('web.object_detail', owner=session.get('username'), name=o.name) }}#run">Run</a>
+      <a class="btn sm" href="{{ url_for('web.download', owner=session.get('username'), name=o.name) }}">Download</a>
+      <form method="POST" action="{{ url_for('web.delete') }}" style="margin:0"
+            data-confirm="Delete {{ o.name }}? This cannot be undone.">
+        <input type="hidden" name="owner" value="{{ session.get('username') }}">
+        <input type="hidden" name="name" value="{{ o.name }}">
+        <button type="submit" class="btn sm danger">Delete</button>
+      </form>
+    </div>
+  </div>
+</div>

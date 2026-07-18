@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Register — d3pl0y{% endblock %}
+{% block content %}
+<div class="card stack">
+  <div class="page-head">
+    <h1>Create an account</h1>
+    <p class="sub">Pick a username. We'll issue you a secret token to use as your password.</p>
+  </div>
+
+  {% if error %}<div class="alert error"><span>{{ error }}</span></div>{% endif %}
+
+  <form method="POST" action="{{ url_for('web.register') }}" class="stack">
+    <div>
+      <label class="field" for="username">Username <span class="req">*</span></label>
+      <input id="username" name="username" value="{{ username or '' }}"
+             placeholder="1–32 letters, digits, '_' or '-'"
+             pattern="[A-Za-z0-9_-]{1,32}" maxlength="32" required autofocus>
+      <p class="hint">This is public and permanent — it's the namespace your objects live under.</p>
+    </div>
+    <button type="submit" class="btn primary block">Register</button>
+  </form>
+
+  <p class="muted">Already registered? <a href="{{ url_for('web.login_form') }}">Log in</a>.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+services:
+  greple:
+    build: .
+    ports:
+      - "7770-7778:7770-7778"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    cpus: 3
+    mem_limit: 2G

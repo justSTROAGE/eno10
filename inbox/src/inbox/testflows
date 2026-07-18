@@ -1,0 +1,51 @@
+a1 LOGIN alice password
+a2 SELECT INBOX
+a3 FETCH 1:* (UID FLAGS RFC822.SIZE INTERNALDATE ENVELOPE)
+a4 LOGOUT
+
+a1 LOGIN alice password
+a2 SELECT INBOX
+a3 FETCH 1 (UID FLAGS RFC822.SIZE INTERNALDATE ENVELOPE)
+a4 LOGOUT
+
+a1 LOGIN alice password
+a2 SELECT INBOX
+a3 FETCH 1:* (UID FLAGS BODY[])
+a4 LOGOUT
+
+a1 AUTHENTICATE PLAIN AGFsaWNlAHBhc3N3b3Jk
+a2 SELECT INBOX
+a3 FETCH 1:* (UID FLAGS)
+a4 LOGOUT
+
+a1 LOGIN alice password
+a2 APPEND INBOX {85}
+From: test@example.com
+To: alice@example.com
+Subject: append-test
+
+hello from append
+a3 SELECT INBOX
+a4 FETCH * (UID FLAGS RFC822.SIZE ENVELOPE)
+a5 LOGOUT
+
+a1 LOGIN alice password
+a2 NAMESPACE
+a3 UID SEARCH ALL
+a4 UID FETCH 1:* (UID FLAGS)
+a5 LOGOUT
+
+
+a1 LOGIN alice password
+a2 GOV_ANNOUNCE {41}
+From: gov@example.com
+Subject: Hi
+
+Body.
+a3 LOGOUT
+
+
+a1 LOGIN bob password
+a2 SELECT INBOX
+a3 FETCH 1:* BODY[]
+a3 LOGOUT

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Log in — d3pl0y{% endblock %}
+{% block content %}
+<div class="card stack">
+  <div class="page-head">
+    <h1>Log in</h1>
+    <p class="sub">Use your username and the secret token you were issued at registration.</p>
+  </div>
+
+  {% if error %}<div class="alert error"><span>{{ error }}</span></div>{% endif %}
+
+  <form method="POST" action="{{ url_for('web.login') }}" class="stack">
+    <input type="hidden" name="next" value="{{ next or '' }}">
+    <div>
+      <label class="field" for="username">Username</label>
+      <input id="username" name="username" value="{{ username or '' }}" required autofocus>
+    </div>
+    <div>
+      <label class="field" for="token">Token</label>
+      <input id="token" name="token" type="password" placeholder="your secret token" required>
+    </div>
+    <button type="submit" class="btn primary block">Log in</button>
+  </form>
+
+  <p class="muted">No account yet? <a href="{{ url_for('web.register_form') }}">Register</a>.</p>
+</div>
+{% endblock %}

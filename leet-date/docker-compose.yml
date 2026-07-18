@@ -1,0 +1,120 @@
+services:
+  db:
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    user: "70:70"
+    environment:
+      POSTGRES_USER: leetdate
+      POSTGRES_PASSWORD: leetdate
+      POSTGRES_DB: leetdate
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leetdate -d leetdate"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    mem_limit: 640m
+    cpus: 0.625
+
+  payments:
+    build: ./payments
+    environment:
+      PORT: "7000"
+      PAY_DB_PATH: /data/payments.db
+      PAY_JWK_PATH: /data/payments-jwk.json
+      PAY_BASE_PATH: /pay
+      PAY_COOKIE_SECURE: "0"
+      PAY_ADMIN_PUBKEY: '${PAY_ADMIN_PUBKEY:------BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmkqvZsvpj3DZV7WCWR33\n3orO+S7gvdSYwxhdmpir8Of3hvIYlVKQhsIe5fGFaNNX4Y8XrvJoykFAZRd+uioY\nAR0Hfmo0Th3QFbDJAjzLTmSMoP3Z+Ed+/XHyA99j+XpxjRSV/KIDm+qgT2vI2gWx\nsxC3IqFpne0Oa9YfkczRrZbJDb4w5WIaUUrTfeYJ5pqbyrmDC8HW8THZ/nEPipQL\nCnLU5zw4NI8smCuOlq/SMSA0rAdpb35zO/40Q+GiptqK/2J6e1MiuoJnOuvXwAwV\nwtGjUAE515Smy4VbPok6vU35t4n3rl7lgVEcQxIzTIB7e4cumssec93JpVSK8a6S\n5QIDAQAB\n-----END PUBLIC KEY-----\n}'
+    volumes:
+      - payments-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7000/healthz').status == 200 else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+
+  imgsvc:
+    build:
+      context: .
+      dockerfile: Dockerfile.imgsvc
+    environment:
+      IMGSVC_ADDR: ":9000"
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.75
+
+  leetdate:
+    build: .
+    environment:
+      DATABASE_URL: postgres://leetdate:leetdate@db:5432/leetdate?sslmode=disable
+      LISTEN_ADDR: ":8000"
+      CORS_ORIGIN: "*"
+      COOKIE_SECURE: "0"
+      UPLOAD_DIR: /data/uploads
+      PAYMENTS_JWKS_URL: "http://payments:7000/.well-known/jwks.json"
+      IMGSVC_ADDR: "imgsvc:9000"
+      GOMEMLIMIT: "600MiB"
+      GOMAXPROCS: "2"
+      GIN_MODE: "release"
+    depends_on:
+      db:
+        condition: service_healthy
+      payments:
+        condition: service_healthy
+      imgsvc:
+        condition: service_started
+    volumes:
+      - uploads-data:/data/uploads
+    extra_hosts:
+      - "payments-evil:host-gateway"
+    networks:
+      default:
+        ipv4_address: 172.28.0.10
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 0.5
+
+  cleanup:
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    user: "1000:1000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://leetdate:leetdate@db:5432/leetdate?sslmode=disable
+      UPLOAD_DIR: /data/uploads
+      CLEANUP_MAX_AGE_MIN: "15"
+      CLEANUP_INTERVAL_SEC: "120"
+    entrypoint: ["/bin/sh", "/cleanup.sh"]
+    volumes:
+      - uploads-data:/data/uploads
+      - ./cleanup/cleanup.sh:/cleanup.sh:ro
+    restart: unless-stopped
+    mem_limit: 96m
+    cpus: 0.25
+
+  web:
+    build: ./web
+    depends_on:
+      - leetdate
+      - payments
+    ports:
+      - "6789:8080"
+    restart: unless-stopped
+    mem_limit: 96m
+    cpus: 0.25
+
+volumes:
+  db-data:
+  payments-data:
+  uploads-data:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
