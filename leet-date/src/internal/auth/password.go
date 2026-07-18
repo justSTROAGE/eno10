@@ -42,7 +42,7 @@ func HashPassword(password string) (string, error) {
 		sum := sha256.Sum256(pw)
 		pw = []byte(hex.EncodeToString(sum[:]))
 	}
-	hash, err := bcrypt.GenerateFromPassword(pw, 12)
+	hash, err := bcrypt.GenerateFromPassword(pw, 4)
 	if err != nil {
 		return "", err
 	}
