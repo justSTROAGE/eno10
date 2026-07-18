@@ -142,11 +142,6 @@ pub fn hash(self: *const @This()) utils.Hash {
 pub fn verificationToken(self: *const @This(), alloc: std.mem.Allocator, prefix: []const u8) ![2 * @sizeOf(utils.Hmac)]u8 {
     var inp: std.Io.Writer.Allocating = .init(alloc);
     defer inp.deinit();
-    // Bind the token to the owning user's hash so a token captured for one
-    // user's netloc record cannot be replayed to verify a different user's
-    // netloc record for the same host:port (IDOR on verification). The owner is
-    // derived from the netloc record being verified, not from the requester.
-    try inp.writer.writeAll(&self.user_hash);
     try inp.writer.writeAll(prefix);
     try self.format(&inp.writer);
     return std.fmt.bytesToHex(utils.hmac(inp.written()), .lower);
