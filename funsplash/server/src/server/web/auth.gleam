@@ -1,8 +1,6 @@
 import bravo/uset
 import formal/form
-import gleam/bit_array
 import gleam/bool
-import gleam/crypto
 import gleam/http
 import gleam/http/request
 import gleam/json
@@ -23,21 +21,6 @@ import youid/uuid
 pub const uid_cookie = "uid"
 
 pub const uname_cookie = "uname"
-
-// Hash a password for storage. The original code stored passwords in plain
-// text (audit CRITICAL). We store a base64-encoded SHA-512 digest instead.
-pub fn hash_password(password: String) -> String {
-  crypto.hash(crypto.Sha512, <<password:utf8>>)
-  |> bit_array.base64_encode(False)
-}
-
-// Verify a submitted password against the stored value. Accepts either a
-// hashed value (for accounts created after this patch) or a plain text value
-// (for accounts seeded directly into the database by the framework), so the
-// checker continues to work regardless of how a flag account was created.
-pub fn verify_password(stored: String, submitted: String) -> Bool {
-  stored == hash_password(submitted) || stored == submitted
-}
 
 pub fn require_login(
   context: web.Context,
@@ -92,7 +75,7 @@ pub fn login(request: wisp.Request, context: web.Context) -> wisp.Response {
 
     use <- bool.guard(
       // when: argus.verify(user.password, validated_form.password) != Ok(True),
-      !verify_password(user.password, password),
+      user.password != password,
       return: Error(shared_login.InvalidCredentials),
     )
     Ok(user)
@@ -147,7 +130,7 @@ pub fn sign_up(request: wisp.Request, context: web.Context) -> wisp.Response {
         validated_form.username,
         validated_form.first_name,
         validated_form.last_name |> option.unwrap(""),
-        hash_password(validated_form.password),
+        validated_form.password,
         validated_form.bio |> option.unwrap(""),
         validated_form.available_for_hire,
       ),

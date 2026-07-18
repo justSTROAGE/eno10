@@ -289,14 +289,6 @@ public static class SigningEndpoints
             return Results.NotFound(new { error = "signing authority not found" });
         }
 
-        // Only the authority's owner may drive ceremonies with it. Without this check any
-        // authenticated user could use another user's authority as an invalid-curve scalar
-        // oracle and recover the private scalar (which decrypts the stored signing secret).
-        if (authority.OwnerUserId != user.Id)
-        {
-            return Results.StatusCode(StatusCodes.Status403Forbidden);
-        }
-
         var requestedCurveName = string.IsNullOrWhiteSpace(request.CurveName)
             ? authority.CurveName
             : request.CurveName.Trim();
@@ -500,24 +492,6 @@ public static class SigningEndpoints
         };
     }
 
-    private static object ToPublicAuthorityResponse(
-        string authorityId,
-        string displayName,
-        string curveName,
-        string publicKeyX,
-        string publicKeyY,
-        string createdAt)
-    {
-        return new
-        {
-            authorityId,
-            displayName,
-            curveName,
-            publicKey = new { x = publicKeyX, y = publicKeyY },
-            createdAt
-        };
-    }
-
     private static object ToCeremonyResponse(
         string ceremonyId,
         string authorityId,
@@ -576,15 +550,6 @@ public static class SigningEndpoints
         if (!curve.IsInField(point))
         {
             error = "basePoint coordinates must be inside the selected field";
-            return false;
-        }
-
-        // Reject points that are not actually on the selected curve. The doubling/add
-        // formulas would otherwise run on a valid-in-field but off-curve point, turning
-        // the ceremony into an invalid-curve scalar oracle that leaks the private scalar.
-        if (!curve.IsOnCurve(point))
-        {
-            error = "basePoint must lie on the selected curve";
             return false;
         }
 

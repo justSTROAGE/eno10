@@ -195,26 +195,12 @@ public static class RemoteAnnexFetcher
         string serviceHost,
         CancellationToken cancellationToken)
     {
-        // Never follow a redirect into the internal archive packet endpoint. Previously a
-        // contract author could use the /api/links/leave open redirect to bounce the annex
-        // fetcher into http://127.0.0.1:1984/internal/archive/packets/<ticket> (carrying the
-        // static worker header), embedding any user's archive packet into their own contract
-        // PDF. The annex fetcher may only reach external/public targets after a redirect;
-        // internal archive packets are reachable solely by the trusted in-process PDF worker.
-        if (IsInternalArchivePacketUri(uri))
+        if (IsAllowedInternalArchivePacketUri(uri, serviceHost))
         {
-            return null;
+            return new ResolvedAnnexTarget(uri, IPAddress.Loopback, IsInternalArchivePacket: true);
         }
 
         return await ResolveInitialTargetAsync(uri, serviceHost, cancellationToken);
-    }
-
-    private static bool IsInternalArchivePacketUri(Uri uri)
-    {
-        return string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-            && (string.Equals(uri.Host, "127.0.0.1", StringComparison.Ordinal)
-                || string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase))
-            && uri.AbsolutePath.StartsWith(InternalArchivePathPrefix, StringComparison.Ordinal);
     }
 
     private static bool IsAllowedInternalArchivePacketUri(Uri uri, string serviceHost)

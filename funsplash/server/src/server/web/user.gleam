@@ -1,6 +1,6 @@
 import gleam/json
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option.{Some}
 import server/collections
 import server/models/collection
 import server/models/photo
@@ -10,7 +10,6 @@ import server/users
 import server/web
 import server/web/helper
 import shared/shared_collection
-import shared/shared_privacy
 import shared/shared_thumbnail
 import shared/shared_user
 import utils
@@ -73,14 +72,11 @@ pub fn get_photos(
   username: String,
 ) -> wisp.Response {
   // alternative do with by_user(id)
-  let is_owner = case context.user {
-    Some(user) if user.username == username -> True
-    _ -> False
-  }
   use photos <- utils.result_guard(
-    case is_owner {
-      True -> photos.get_by_username(context.state, username, True)
-      False -> photos.get_by_username(context.state, username, False)
+    case context.user {
+      Some(user) if user.username == username ->
+        photos.get_by_username(context.state, username, True)
+      _ -> photos.get_by_username(context.state, username, False)
     },
     wisp.not_found(),
   )
@@ -94,26 +90,8 @@ pub fn get_photos(
   photos
   |> list.map(fn(p) {
     let current_user_collections = helper.current_user_collections(context, p)
-    let thumbnail =
-      p
-      |> photo.to_shared_thumbnail(creator, False, current_user_collections)
-    // Privacy guard (audit HIGH: the public photo listing leaked the
-    // description and asset_id of premium/private photos via the thumbnail
-    // JSON to anyone). Redact those fields for non-owners.
-    case is_owner || p.privacy == shared_privacy.Public {
-      True -> thumbnail
-      False ->
-        shared_thumbnail.Thumbnail(
-          public_id: thumbnail.public_id,
-          asset_id: "",
-          description: option.None,
-          creator: thumbnail.creator,
-          privacy: thumbnail.privacy,
-          user_liked: thumbnail.user_liked,
-          show_on_profile: thumbnail.show_on_profile,
-          current_user_collections: thumbnail.current_user_collections,
-        )
-    }
+    p
+    |> photo.to_shared_thumbnail(creator, False, current_user_collections)
     |> shared_thumbnail.thumbnail_to_json
   })
   |> json.preprocessed_array

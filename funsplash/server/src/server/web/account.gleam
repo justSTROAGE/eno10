@@ -7,7 +7,6 @@ import server/users
 import server/web
 import server/web/auth
 import shared/shared_account
-import utils
 
 import wisp
 
@@ -57,23 +56,8 @@ pub fn change_password(
       |> result.replace_error(shared_account.InvalidData),
     )
 
-    // Verify the old password against the stored value before accepting the
-    // new one (audit HIGH: change_password never checked the old password, so
-    // a forged/hijacked session could reset the victim's password). The stored
-    // value may be hashed or plain text (see auth.verify_password).
-    use stored <- result.try(
-      case utils.db_limit(sql.user_find_by_id(context.state.db, user.id)) {
-        Ok(row) -> Ok(row.password)
-        Error(_) -> Error(shared_account.InternalError)
-      },
-    )
-    use <- bool.guard(
-      !auth.verify_password(stored, form.old),
-      Error(shared_account.InvalidData),
-    )
-
     let update_res =
-      sql.user_update_password(context.state.db, user.id, auth.hash_password(form.new))
+      sql.user_update_password(context.state.db, user.id, form.new)
     use <- bool.guard(
       result.is_error(update_res),
       Error(shared_account.InternalError),

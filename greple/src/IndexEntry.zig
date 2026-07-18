@@ -89,16 +89,6 @@ pub fn getByUserOrNetloc(alloc: std.mem.Allocator, user_hash: utils.Hash, netloc
             continue;
         }
 
-        // Netloc verification only proves the requester can read a token sent to
-        // host:port; it does NOT prove ownership of the indexed page. Therefore a
-        // verified netloc grants access ONLY to public entries on that netloc, never
-        // to another user's private entries (prevents the private-flag disclosure
-        // authorization bypass via /console).
-        if (!index_entry.public) {
-            index_entry.deinit(alloc);
-            continue;
-        }
-
         for (netlocs) |nl| if (nl.verified and std.mem.eql(u8, nl.host, index_entry.url.host) and nl.port == index_entry.url.port) {
             try index_entries.append(alloc, index_entry);
             continue :outer;
