@@ -571,6 +571,33 @@ def export_notes():
     order_id = request.args.get('order_id', type=int)
 
     if order_id:
+        # IDOR fix: only export notes for orders the caller is authorized to see
+        # (order's customer, the restaurant owner, or an assigned driver), mirroring
+        # get_order_details ownership checks.
+        order = db_query("SELECT customer_id, restaurant_id FROM orders WHERE id = %s",
+                         (order_id,), fetchone=True)
+        if not order:
+            return jsonify({"error": "Order not found"}), 404
+
+        user = g.current_user
+        authorized = (order['customer_id'] == user['id'])
+        if not authorized:
+            rest = db_query(
+                "SELECT id FROM restaurants WHERE id = %s AND user_id = %s",
+                (order['restaurant_id'], user['id']), fetchone=True
+            )
+            if rest:
+                authorized = True
+        if not authorized:
+            delivery = db_query(
+                "SELECT id FROM deliveries WHERE order_id = %s AND driver_id = %s",
+                (order_id, user['id']), fetchone=True
+            )
+            if delivery:
+                authorized = True
+        if not authorized:
+            return jsonify({"error": "Access denied"}), 403
+
         notes = db_query(
             "SELECT id, order_id, encrypted_data, hmac_signature FROM order_notes WHERE order_id = %s",
             (order_id,), fetchall=True

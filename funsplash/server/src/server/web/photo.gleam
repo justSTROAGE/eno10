@@ -108,6 +108,16 @@ pub fn get(
     photos.get_by_public(context.state, public_id),
     wisp.not_found(),
   )
+  // Privacy guard (audit HIGH: metadata IDOR leaked asset_id/description for
+  // private/premium photos to anyone). Only the creator may view metadata for
+  // non-public photos; everyone else gets a 404 so no asset_id is exposed.
+  use <- bool.guard(
+    case context.user {
+      Some(viewer) if viewer.id == photo.creator -> False
+      _ -> photo.privacy != Public
+    },
+    wisp.not_found(),
+  )
   use user <- utils.result_guard(
     users.get_by_id(context.state, photo.creator),
     wisp.internal_server_error(),

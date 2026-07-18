@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -76,14 +74,6 @@ func (v *Verifier) fetchSet(ctx context.Context, jwksURL string) (jwk.Set, error
 	return jwk.Parse(body)
 }
 
-func allowedJKU(raw string) bool {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return false
-	}
-	return strings.HasPrefix(u.Host, "payments")
-}
-
 func (v *Verifier) keyByID(kid string) (jwk.Key, bool) {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
@@ -106,6 +96,16 @@ func (v *Verifier) Verify(ctx context.Context, tokenStr string) (*Claims, error)
 	kid := hdr.KeyID()
 	alg := hdr.Algorithm()
 
+	// Defense: never honor attacker-supplied key material. Reject any token
+	// that carries an inline JWK or a "jku" header pointing elsewhere — the
+	// verification key must come ONLY from the configured payments JWKS URL.
+	if hdr.JWK() != nil {
+		return nil, errors.New("inline JWK is not allowed")
+	}
+	if jkuStr := hdr.JWKSetURL(); jkuStr != "" {
+		return nil, errors.New("jku header is not allowed")
+	}
+
 	var key jwk.Key
 
 	if k, ok := v.keyByID(kid); ok {
@@ -120,23 +120,6 @@ func (v *Verifier) Verify(ctx context.Context, tokenStr string) (*Claims, error)
 		}
 	}
 
-	if key == nil {
-		if inline := hdr.JWK(); inline != nil {
-			if k, found := v.keyByID(inline.KeyID()); found {
-				key = k
-			}
-		}
-	}
-
-	if key == nil {
-		if jkuStr := hdr.JWKSetURL(); jkuStr != "" && allowedJKU(jkuStr) {
-			if set, err := v.fetchSet(ctx, jkuStr); err == nil {
-				if k, ok := set.LookupKeyID(kid); ok {
-					key = k
-				}
-			}
-		}
-	}
 	if key == nil {
 		return nil, errors.New("no verification key")
 	}

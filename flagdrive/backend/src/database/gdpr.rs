@@ -24,20 +24,22 @@ pub async fn get_gdpr_data(
     timestamp_or_latest: &str,
     nonce: &str,
 ) -> Result<String, sqlx::Error> {
-    let mut nonce_upper = nonce.to_string();
-    if let Some(last_char) = nonce_upper.pop() {
-        let next_char = (last_char as u8 + 1) as char;
-        nonce_upper.push(next_char);
+    // SECURITY: require an EXACT nonce match. The previous implementation used a
+    // range query (`nonce >= $2 AND nonce < $3`) so that any nonce in a wide
+    // range would match, making the GDPR download IDOR enumerable. With an
+    // exact match against the 128-bit random nonce, the export is unguessable
+    // without the exact gdpr_id returned to the owner at request time.
+    if nonce.len() != 32 || !nonce.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(sqlx::Error::RowNotFound);
     }
 
     let row = if timestamp_or_latest == "latest" {
         sqlx::query(
-            "SELECT content FROM gdpr_data WHERE username = $1 AND nonce >= $2 AND nonce < $3 \
+            "SELECT content FROM gdpr_data WHERE username = $1 AND nonce = $2 \
              ORDER BY timestamp DESC LIMIT 1",
         )
         .bind(username)
         .bind(nonce)
-        .bind(&nonce_upper)
         .fetch_one(pool)
         .await?
     } else {
@@ -46,12 +48,11 @@ pub async fn get_gdpr_data(
             .map_err(|_| sqlx::Error::RowNotFound)?;
 
         sqlx::query(
-            "SELECT content FROM gdpr_data WHERE username = $1 AND timestamp = $2 AND nonce >= $3 AND nonce < $4",
+            "SELECT content FROM gdpr_data WHERE username = $1 AND timestamp = $2 AND nonce = $3",
         )
         .bind(username)
         .bind(timestamp)
         .bind(nonce)
-        .bind(&nonce_upper)
         .fetch_one(pool)
         .await?
     };

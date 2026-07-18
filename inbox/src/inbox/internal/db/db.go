@@ -149,6 +149,9 @@ func (d *DB) readSubscriptions(username string) ([]string, error) {
 }
 
 func (d *DB) Subscribe(username, mailbox string) error {
+	if !isValidMailboxName(mailbox) {
+		return fmt.Errorf("invalid mailbox name")
+	}
 	subs, _ := d.readSubscriptions(username)
 	for _, s := range subs {
 		if s == mailbox {
@@ -160,6 +163,9 @@ func (d *DB) Subscribe(username, mailbox string) error {
 }
 
 func (d *DB) Unsubscribe(username, mailbox string) error {
+	if !isValidMailboxName(mailbox) {
+		return fmt.Errorf("invalid mailbox name")
+	}
 	subs, _ := d.readSubscriptions(username)
 	var kept []string
 	for _, s := range subs {
@@ -209,10 +215,20 @@ func (d *DB) ensureMailbox(username, name string) error {
 }
 
 func (d *DB) GetMailbox(username, name string) (Mailbox, error) {
+	// Defense-in-depth: validate the mailbox name charset first. This rejects
+	// path separators and traversal segments ("..", leading ".") regardless of
+	// any subscription state.
+	if !isValidMailboxName(name) {
+		return Mailbox{}, fmt.Errorf("no such mailbox: %s", name)
+	}
 	dir := d.mailboxDir(username, name)
 	userBase := d.userDir(username)
-	if !strings.HasPrefix(dir, userBase+string(os.PathSeparator)) &&
-		!d.IsSubscribed(username, name) {
+	// Canonicalize and ensure the resolved mailbox directory stays strictly
+	// under the requesting user's own directory. A subscription (IsSubscribed)
+	// must NEVER authorize access to a mailbox that resolves outside the
+	// caller's base — this closes the path-traversal IDOR.
+	cleaned := filepath.Clean(dir)
+	if cleaned != userBase && !strings.HasPrefix(cleaned, userBase+string(os.PathSeparator)) {
 		return Mailbox{}, fmt.Errorf("no such mailbox: %s", name)
 	}
 	if _, err := os.Stat(dir); err != nil {
@@ -394,8 +410,18 @@ func (d *DB) FetchMessages(username, mailbox string, seqNums []int64) ([]Message
 
 func (d *DB) AppendMessage(username, mailbox, flags string, internalDate time.Time, body []byte) (uid int64, err error) {
 
+	if !isValidMailboxName(mailbox) {
+		return 0, fmt.Errorf("invalid mailbox name")
+	}
 	if d.IsArchived(username, mailbox) {
 		return 0, fmt.Errorf("mailbox is read-only (archived)")
+	}
+	// Ensure the resolved mailbox stays under the requesting user's own
+	// directory; reject path-traversal mailbox names even for appends.
+	mbDir := filepath.Clean(d.mailboxDir(username, mailbox))
+	userBase := d.userDir(username)
+	if mbDir != userBase && !strings.HasPrefix(mbDir, userBase+string(os.PathSeparator)) {
+		return 0, fmt.Errorf("invalid mailbox name")
 	}
 	uidnextPath := filepath.Join(d.mailboxDir(username, mailbox), "uidnext")
 

@@ -82,15 +82,15 @@ public static class SigningSecretBox
 
     private static BigInteger DeriveProfileScalar(EcCurve curve, BigInteger scalar)
     {
-        return string.Equals(curve.Name, SigningCurves.DefaultCurveName, StringComparison.OrdinalIgnoreCase)
-            ? scalar & ((BigInteger.One << DefaultProfileKeyBits) - BigInteger.One)
-            : scalar;
+        // Previously the default curve (P-256) masked the scalar to its low 96 bits for the
+        // keystream key, reducing the effective key to 96 bits and letting an attacker who
+        // recovered only the low bits of the private scalar decrypt the signing secret. Use
+        // the full scalar for every curve so partial scalar recovery is insufficient.
+        return scalar;
     }
 
     private static int ProfileScalarBytes(EcCurve curve)
     {
-        return string.Equals(curve.Name, SigningCurves.DefaultCurveName, StringComparison.OrdinalIgnoreCase)
-            ? DefaultProfileKeyBytes
-            : curve.ScalarBytes;
+        return curve.ScalarBytes;
     }
 }

@@ -20,6 +20,13 @@ use flagdrive_shared::{
 };
 use rand::prelude::*;
 
+/// Constant-time comparison of two byte strings so that protection-key
+/// verification does not leak how many leading bytes match via timing.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    use subtle::ConstantTimeEq;
+    a.ct_eq(b).into()
+}
+
 pub async fn get_file_list(
     State(api_state): State<FlagDriveAPIState>,
     Path(username): Path<String>,
@@ -141,8 +148,6 @@ pub async fn upload_file(
         provided_iv.copy_from_slice(&content_bytes[0..12]);
         let ct_tag = &content_bytes[12..];
 
-        let constructed_iv = construct_iv(&username);
-
         let mut verification_aad = Vec::with_capacity(12 + username.len());
         verification_aad.extend_from_slice(&provided_iv);
         verification_aad.extend_from_slice(username.as_bytes());
@@ -171,8 +176,11 @@ pub async fn upload_file(
         let decrypted_plaintext =
             aes_gcm_decrypt_no_verify(ct, &user_key, &key, &api_state.server_key, &provided_iv);
 
+        // Re-encrypt with a FRESH random nonce (nonce reuse fix) and prepend it
+        // to the stored content: stored = nonce(12) || ciphertext || tag(16).
+        let new_iv = construct_iv(&username);
         let mut encrypt_aad = Vec::with_capacity(12 + username.len());
-        encrypt_aad.extend_from_slice(&constructed_iv);
+        encrypt_aad.extend_from_slice(&new_iv);
         encrypt_aad.extend_from_slice(username.as_bytes());
 
         let encrypted = aes_gcm_encrypt(
@@ -180,12 +188,18 @@ pub async fn upload_file(
             &user_key,
             &key,
             &api_state.server_key,
-            &constructed_iv,
+            &new_iv,
             &encrypt_aad,
         );
 
-        (encrypted, if !key.is_empty() { 1 } else { 0 })
+        let mut stored = Vec::with_capacity(12 + encrypted.len());
+        stored.extend_from_slice(&new_iv);
+        stored.extend_from_slice(&encrypted);
+
+        (stored, if !key.is_empty() { 1 } else { 0 })
     } else {
+        // Fresh random nonce per file (nonce reuse fix). Stored content layout:
+        // nonce(12) || ciphertext || tag(16).
         let iv = construct_iv(&username);
         let mut encrypt_aad = Vec::with_capacity(12 + username.len());
         encrypt_aad.extend_from_slice(&iv);
@@ -193,7 +207,12 @@ pub async fn upload_file(
 
         let encrypted =
             aes_gcm_encrypt(&content_bytes, &user_key, &key, &api_state.server_key, &iv, &encrypt_aad);
-        (encrypted, if !key.is_empty() { 1 } else { 0 })
+
+        let mut stored = Vec::with_capacity(12 + encrypted.len());
+        stored.extend_from_slice(&iv);
+        stored.extend_from_slice(&encrypted);
+
+        (stored, if !key.is_empty() { 1 } else { 0 })
     };
 
     if let Err(err) = add_upload_file(
@@ -322,42 +341,64 @@ pub async fn download_file(
             .unwrap();
     }
 
-    let returned_content = if backup {
-        let mut iv_and_content = construct_iv(&file.owner).to_vec();
-        iv_and_content.extend_from_slice(&content);
-        iv_and_content
-    } else {
-        if file.is_protected {
-            if key != real_protection_key {
-                return Response::builder()
-                    .status(StatusCode::FORBIDDEN)
-                    .header("content-type", "application/json")
-                    .body(Body::from(
-                        serde_json::to_string(&ErrorResponse {
-                            error: "Invalid decryption key".to_string(),
-                        })
-                        .unwrap(),
-                    ))
-                    .unwrap();
-            }
-        }
+    // Stored content layout (nonce reuse fix): nonce(12) || ciphertext || tag(16).
+    // The nonce is a fresh random value chosen at upload time and stored with
+    // the file, so we read it back from the blob instead of deriving it.
+    if content.len() < 28 {
+        return Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&ErrorResponse {
+                    error: "Corrupt file content".to_string(),
+                })
+                .unwrap(),
+            ))
+            .unwrap();
+    }
 
+    let mut nonce = [0u8; 12];
+    nonce.copy_from_slice(&content[0..12]);
+    let ct_tag = &content[12..];
+
+    // Protected files require the correct protection key for ANY download mode,
+    // including backup=true. The previous backup path skipped this check and
+    // returned raw iv||ciphertext, leaking the (now-random) nonce and the
+    // ciphertext. Constant-time compare avoids timing oracle on the key.
+    if file.is_protected && !constant_time_eq(key.as_bytes(), real_protection_key.as_bytes()) {
+        return Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&ErrorResponse {
+                    error: "Invalid decryption key".to_string(),
+                })
+                .unwrap(),
+            ))
+            .unwrap();
+    }
+
+    let returned_content = if backup {
+        // Return the raw stored blob (nonce || ciphertext || tag). This is only
+        // reachable after the has_access check above AND the protection_key
+        // check for protected files, so it no longer bypasses authorization.
+        content
+    } else {
         let user_key = get_user_encryption_key(&api_state.pool, &file.owner)
             .await
             .unwrap_or_default();
 
         let decrypt_key = if file.is_protected { key } else { "" };
-        let iv = construct_iv(&file.owner);
         let mut decrypt_aad = Vec::with_capacity(12 + file.owner.len());
-        decrypt_aad.extend_from_slice(&iv);
+        decrypt_aad.extend_from_slice(&nonce);
         decrypt_aad.extend_from_slice(file.owner.as_bytes());
 
         match aes_gcm_decrypt(
-            &content,
+            ct_tag,
             &user_key,
             decrypt_key,
             &api_state.server_key,
-            &iv,
+            &nonce,
             &decrypt_aad,
         ) {
             Ok(decrypted) => decrypted,

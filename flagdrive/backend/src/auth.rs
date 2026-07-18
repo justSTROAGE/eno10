@@ -1,38 +1,35 @@
 use std::{convert::Infallible, str::FromStr};
 
-#[repr(C)]
+/// Maximum length of a session token. Session tokens are generated as
+/// 128 alphanumeric characters (see database::users::create_new_token).
+/// Any input longer than this is rejected outright so that a client can
+/// never overflow an internal buffer or set a privileged flag.
+pub const TOKEN_MAX_LEN: usize = 128;
+
+/// A parsed session token.
+///
+/// This is a plain, safe Rust struct. There is intentionally no
+/// `is_api_token` field or `repr(C)` layout: the previous implementation
+/// used a `repr(C)` { token:[u8;128], is_api_token:u8 } buffer that could
+/// be overflowed by a 129-byte token string, letting a client set the
+/// `is_api_token` byte and bypass the follow/unfollow authorization check.
+/// The "api token" concept does not exist anywhere else in the codebase, so
+/// the privileged path is removed entirely.
+#[derive(Default)]
 pub struct AuthToken {
-    pub token: [u8; 128],
-    pub is_api_token: u8,
+    token: String,
 }
 
 impl AuthToken {
+    /// Returns the trimmed token string for DB lookup.
     pub fn get_token(&self) -> String {
-        String::from_utf8(self.token.to_vec())
-            .unwrap_or_default()
-            .trim_end_matches('\0')
-            .to_string()
+        self.token.trim_end_matches('\0').to_string()
     }
 
+    /// There is no longer any "api token" concept. Always false.
+    #[allow(dead_code)]
     pub fn is_api_token(&self) -> bool {
-        self.is_api_token != 0
-    }
-
-    pub fn build_container(&mut self) -> TokenContainer {
-        TokenContainer(
-            std::mem::size_of::<Self>(),
-            &raw mut self.token as usize,
-            std::mem::size_of::<Self>(),
-        )
-    }
-}
-
-impl Default for AuthToken {
-    fn default() -> Self {
-        Self {
-            token: [0u8; 128],
-            is_api_token: 0,
-        }
+        false
     }
 }
 
@@ -40,61 +37,18 @@ impl FromStr for AuthToken {
     type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut auth = Self::default();
+        // Bounds check: reject any token longer than the legitimate 128-char
+        // length. This is the one-byte overflow fix: previously a 129+ byte
+        // input overwrote the is_api_token byte. Returning an empty token makes
+        // the subsequent DB lookup fail (401 Unauthorized) for any overlong
+        // input, so the follow/unfollow bypass is impossible. We never copy
+        // more than TOKEN_MAX_LEN bytes and never write past token storage.
+        if s.len() > TOKEN_MAX_LEN {
+            return Ok(Self::default());
+        }
 
-        auth.build_container().parse_token(&s);
-
-        Ok(auth)
+        Ok(Self {
+            token: s.to_string(),
+        })
     }
-}
-
-#[repr(C)]
-pub struct TokenContainer(usize, usize, usize);
-
-impl TokenContainer {
-    pub fn parse_token(self, s: &str) {
-        use std::hint::black_box;
-        let mut con: Vec<u8> = SecurityContext::check_token_context(
-            black_box(&mut SecurityContext::Authorized(None)),
-            self,
-        );
-        con.iter_mut()
-            .zip((&s).bytes().chain(std::iter::repeat(0)))
-            .for_each(|(dst, src)| *dst = src);
-        std::mem::forget(con);
-    }
-}
-
-#[allow(dead_code)]
-enum SecurityContext<A, B> {
-    Guest(Option<Box<A>>),
-    Authorized(Option<Box<B>>),
-}
-
-impl<A, B> SecurityContext<A, B> {
-    pub fn check_token_context(&mut self, claims: A) -> B {
-        let Self::Authorized(claims_slot) = self else {
-            unreachable!()
-        };
-
-        let session = check_session_token(claims_slot);
-
-        *self = Self::Guest(Some(Box::new(claims)));
-        std::hint::black_box(self);
-
-        *session.take().unwrap()
-    }
-}
-
-pub fn session_validator<'a, 'b, T: ?Sized>(
-    _authority: &'a &'b (),
-    session_ref: &'b mut T,
-) -> &'a mut T {
-    session_ref
-}
-
-pub fn check_session_token<'a, 'b, T: ?Sized>(context: &'a mut T) -> &'b mut T {
-    const TOKEN_SIGN_KEY: &&() = &&();
-    let validator: for<'x> fn(_, &'x mut T) -> &'b mut T = session_validator;
-    validator(TOKEN_SIGN_KEY, context)
 }

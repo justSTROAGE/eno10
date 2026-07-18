@@ -34,18 +34,19 @@ pub fn derive_aes_key(user_key: &str, file_key: &str, server_key: &str) -> [u8; 
     out
 }
 
-pub fn construct_iv(username: &str) -> [u8; 12] {
-    let mut hasher = Sha256::new();
-    hasher.update(username.as_bytes());
-    let hash = hasher.finalize();
-    let mut iv = [0u8; 12];
-    for i in 0..12 {
-        let b1 = hash[i];
-        let b2 = hash[i + 12];
-        let b3 = if i + 24 < 32 { hash[i + 24] } else { 0 };
-        iv[i] = b1 ^ b2 ^ b3;
-    }
-    iv
+/// Generate a fresh random 12-byte AES-GCM nonce.
+///
+/// SECURITY: the previous implementation derived the nonce deterministically
+/// from the owner username (construct_iv(username)), so every file owned by
+/// the same user reused the same (key, nonce) pair for unprotected files.
+/// AES-GCM nonce reuse leaks the XOR of plaintexts (identical keystream),
+/// enabling plaintext recovery by XORing two ciphertexts when one plaintext
+/// is known. We now generate a cryptographically random nonce per encryption
+/// and store it alongside the ciphertext (prepended to the stored content),
+/// so (key, nonce) is never reused across files.
+pub fn construct_iv(_username: &str) -> [u8; 12] {
+    use rand::prelude::*;
+    rand::rng().random()
 }
 
 pub fn aes_gcm_encrypt(

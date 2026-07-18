@@ -66,6 +66,12 @@ COPY Cargo.toml Cargo.lock ./
 COPY backend/Cargo.toml ./backend/
 COPY shared ./shared
 COPY frontend ./frontend
+# Pre-generate the tailwind CSS output so trunk can canonicalize the
+# data-trunk tailwind-css asset link (it processes the link before running the
+# build-stage hook that would otherwise generate it). tailwindcss does not
+# create parent dirs, so create the directory first.
+RUN mkdir -p frontend/style && \
+    cd frontend && tailwindcss -i src/styles/tailwind.css -o style/tailwind.css && cd ..
 RUN --mount=type=cache,id=cargo-registry-frontend,target=/usr/local/cargo/registry \
     --mount=type=cache,id=cargo-target-frontend,target=/ctf/service/target \
     cd frontend && trunk build --release --quiet && cd ..
