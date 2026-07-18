@@ -168,15 +168,13 @@ public static class SigningEndpoints
             while (reader.Read())
             {
                 canonicalUsername ??= reader.GetString(0);
-                // Public (unauthenticated) listing: NEVER return the encrypted secret_blob.
-                // Leaking secretBlob gives an attacker the ciphertext half of the signing
-                // secret (the flag channel) and the public_id needed to target ceremonies.
-                authorities.Add(ToPublicAuthorityResponse(
+                authorities.Add(ToAuthorityResponse(
                     reader.GetString(1),
                     reader.GetString(2),
                     reader.GetString(3),
                     reader.GetString(4),
                     reader.GetString(5),
+                    reader.IsDBNull(6) ? null : reader.GetString(6),
                     reader.GetString(7)));
             }
         }
