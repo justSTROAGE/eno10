@@ -1,3 +1,4 @@
+from os import abort
 import os
 import json
 import hashlib
@@ -752,6 +753,8 @@ def _lt_read_frame_raw(sock):
 @app.route('/api/livetrack/raw', methods=['POST'])
 @require_auth
 def livetrack_raw():
+    if not app.config["DEBUG"]:
+        abort(404)
     data       = request.get_json() or {}
     frames_hex = data.get('frames', [])
 
