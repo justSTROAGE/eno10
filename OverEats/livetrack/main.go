@@ -541,13 +541,13 @@ func handleSetDebug(state *ConnState, payload []byte) Response {
 		return authRequiredResponse()
 	}
 
-	state.mu.Lock()
-	state.debugMode = true
-	state.mu.Unlock()
-
 	if !globalDebug {
 		return errorResponse("Debug mode is disabled in production")
 	}
+
+	state.mu.Lock()
+	state.debugMode = true
+	state.mu.Unlock()
 
 	return okResponse("Debug mode enabled")
 }
